@@ -1,0 +1,36 @@
+# FastAPI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Redis & Celery
+celery==5.3.6
+redis==5.0.1
+
+# YouTube
+youtube-transcript-api==0.6.2
+yt-dlp>=2024.12.6
+
+# AI
+google-generativeai==0.8.3
+openai==1.58.1
+
+# TTS
+elevenlabs
+pydub==0.25.1
+
+# Video Processing
+moviepy==1.0.3
+ffmpeg-python==0.2.0
+
+# Utilities
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+httpx==0.26.0
+aiofiles==23.2.1
