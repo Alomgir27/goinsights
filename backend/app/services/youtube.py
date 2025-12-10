@@ -77,7 +77,7 @@ class YouTubeService:
             "format": "best[height<=720]",
             "outtmpl": output_path,
             "quiet": True,
-            "cookiefile": self.cookies_file
+            "cookiefile": self.cookies_file,
         }
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])

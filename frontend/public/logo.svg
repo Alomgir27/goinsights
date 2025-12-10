@@ -1,0 +1,24 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="95" fill="url(#gradient1)" stroke="#1a1a1a" stroke-width="2"/>
+  
+  <!-- Play Button Triangle -->
+  <path d="M75 60 L145 100 L75 140 Z" fill="#ffffff" opacity="0.95"/>
+  
+  <!-- AI Sparkle Elements -->
+  <circle cx="155" cy="50" r="8" fill="#FFD700"/>
+  <circle cx="165" cy="65" r="5" fill="#FFD700" opacity="0.7"/>
+  <circle cx="145" cy="40" r="4" fill="#FFD700" opacity="0.5"/>
+  
+  <!-- Insight Lines -->
+  <path d="M45 165 L65 145 L85 155 L105 135" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <circle cx="105" cy="135" r="4" fill="#FFD700"/>
+  
+  <defs>
+    <linearGradient id="gradient1" x1="0" y1="0" x2="200" y2="200">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#333333"/>
+    </linearGradient>
+  </defs>
+</svg>
+

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import select
 from app.database import get_db
 from app.services.gemini import GeminiService
@@ -18,11 +19,13 @@ class AskRequest(BaseModel):
 
 class ScriptRequest(BaseModel):
     project_id: str
-    duration_seconds: int = 120
+    duration_seconds: int = 300
+    language: str = "English"
 
 class YoutubeInfoRequest(BaseModel):
     project_id: str
     script: str = ""
+    language: str = "English"
 
 @router.post("/summarize")
 async def summarize(request: SummarizeRequest, db: AsyncSession = Depends(get_db)):
@@ -58,8 +61,9 @@ async def generate_script(request: ScriptRequest, db: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail="Project not found")
     
     service = GeminiService()
+    video_duration = project.duration or 300
     
-    # Build full transcript with timestamps
+    # Build transcript with timestamps
     transcript_parts = []
     for t in project.transcript:
         start = t.get('start', 0)
@@ -69,25 +73,45 @@ async def generate_script(request: ScriptRequest, db: AsyncSession = Depends(get
     
     transcript_with_time = "\n".join(transcript_parts)
     
-    # Log for debugging
-    print(f"Transcript length: {len(transcript_with_time)} chars, {len(project.transcript)} segments")
+    # Add video duration context
+    transcript_with_time = f"VIDEO DURATION: {video_duration} seconds\n\n{transcript_with_time}"
     
-    result = await service.generate_script(transcript_with_time, request.duration_seconds)
+    print(f"Transcript: {len(transcript_with_time)} chars, {len(project.transcript)} segments, video: {video_duration}s, lang: {request.language}")
+    
+    result = await service.generate_script(transcript_with_time, request.duration_seconds, request.language)
+    
+    # Validate and fix source timestamps to be within video duration
+    if result.get("segments"):
+        for seg in result["segments"]:
+            seg["source_start"] = max(0, min(seg.get("source_start", 0), video_duration - 10))
+            seg["source_end"] = max(seg["source_start"] + 5, min(seg.get("source_end", seg["source_start"] + 8), video_duration))
     
     project.script = result["script"]
-    project.segments_data = result.get("segments", [])  # Save segments to DB
+    project.segments_data = result.get("segments", [])
+    flag_modified(project, "segments_data")
     await db.commit()
+    await db.refresh(project)
     
+    print(f"Generated {len(result.get('segments', []))} segments from transcript")
     return result
 
 @router.post("/youtube-info")
 async def generate_youtube_info(request: YoutubeInfoRequest, db: AsyncSession = Depends(get_db)):
+    import json
+    import os
+    
     project = await db.get(Project, request.project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
     service = GeminiService()
-    result = await service.generate_youtube_info(project.title, request.script or project.script or "")
+    result = await service.generate_youtube_info(project.title, request.script or project.script or "", request.language)
+    
+    # Save to file for persistence
+    project_dir = f"./storage/{request.project_id}"
+    os.makedirs(project_dir, exist_ok=True)
+    with open(f"{project_dir}/youtube_info.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False)
     
     return result
 

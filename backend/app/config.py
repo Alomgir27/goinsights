@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     assemblyai_api_key: str = ""
     elevenlabs_api_key: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:3000/auth/callback"
     storage_path: str = "./storage"
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

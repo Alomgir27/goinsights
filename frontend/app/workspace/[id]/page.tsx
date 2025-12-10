@@ -3,29 +3,62 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import ReactPlayer from "react-player";
-import { Download, Clock, Sparkles, Loader2, FileText, Play, Pause, RefreshCw, Merge, Video, Image, Settings, Scissors, ArrowLeft, Music, Copy, Check, Youtube, X, Volume2 } from "lucide-react";
+import { Clock, Sparkles, Loader2, FileText, Play, RefreshCw, Video, Scissors, ArrowLeft, Plus, Trash2, Download } from "lucide-react";
 import Link from "next/link";
-import { ai, voice, video, projects } from "@/lib/api";
+import { ai, voice, video, projects, youtube } from "@/lib/api";
 import { useStore } from "@/lib/store";
+import VoiceSelector from "@/components/workspace/VoiceSelector";
+import MediaManager from "@/components/workspace/MediaManager";
+import CustomScriptEditor from "@/components/workspace/CustomScriptEditor";
+import MergeOptionsStep from "@/components/workspace/MergeOptionsStep";
+import FinalVideoSection from "@/components/workspace/FinalVideoSection";
+import MusicSheet from "@/components/workspace/MusicSheet";
+import VoiceSettings from "@/components/workspace/VoiceSettings";
 
 interface MusicPreset { id: string; name: string; desc: string; cached: boolean; }
 
+interface MediaAsset {
+  id: string;
+  type: "image" | "video";
+  source: "upload" | "ai_generated";
+  path: string;
+  duration?: number;
+  prompt?: string;
+  order: number;
+  startTime: number;
+  endTime: number;
+  assignedSegments: number[];
+}
+
 interface Segment { 
-  text: string; 
-  start: number;  // Output video timeline
+  text: string;  // Clean text for TTS
+  displayText?: string;  // Text with speaker for UI display
+  speaker?: string;  // Speaker name for dialogue
+  start: number;
   end: number; 
-  sourceStart: number;  // Original video clip source
+  sourceStart: number;
   sourceEnd: number;
   audioGenerated: boolean; 
   clipExtracted: boolean; 
   timestamp: number; 
+  voiceId?: string;
+  mediaId?: string;
+  mediaType?: string;
+  duration?: number;
+  trimStart?: number;
+  trimEnd?: number;
+  effect?: "none" | "fade" | "pop" | "slide" | "zoom";
 }
 
 export default function Workspace(): React.ReactElement {
   const { id } = useParams();
   const { project, setProject, updateProject } = useStore();
   const [currentTime, setCurrentTime] = useState(0);
-  const [selectedVoice, setSelectedVoice] = useState("sarah");
+  const [selectedVoice, setSelectedVoice] = useState("aria");
+  const [selectedModel, setSelectedModel] = useState("v2");
+  const [voices, setVoices] = useState<{id: string; name: string; gender: string; style: string; accent: string; langs: string}[]>([]);
+  const [playingDemo, setPlayingDemo] = useState<string | null>(null);
+  const demoAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const [processing, setProcessing] = useState("");
   const [segments, setSegments] = useState<Segment[]>([]);
   const [generatingIndex, setGeneratingIndex] = useState<number | null>(null);
@@ -33,43 +66,156 @@ export default function Workspace(): React.ReactElement {
   const [speed, setSpeed] = useState(1.0);
   const [stability, setStability] = useState(0.5);
   const [videoDownloaded, setVideoDownloaded] = useState(false);
-  const [mergeOptions, setMergeOptions] = useState({ subtitles: false, resize: "16:9", bgMusic: "", bgMusicVolume: 0.3 });
+  const [mergeOptions, setMergeOptions] = useState<{subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; subtitleSize: number; dialogueMode: boolean; speaker1Position: string; speaker2Position: string; dialogueBgStyle: string; resize: string; bgMusic: string; bgMusicVolume: number}>({ subtitles: false, animatedSubtitles: true, subtitleStyle: "karaoke", subtitleSize: 72, dialogueMode: false, speaker1Position: "top-left", speaker2Position: "top-right", dialogueBgStyle: "transparent", resize: "16:9", bgMusic: "", bgMusicVolume: 0.3 });
   const [showMusicSheet, setShowMusicSheet] = useState(false);
   const [youtubeInfo, setYoutubeInfo] = useState({ title: "", description: "", tags: "" });
   const [thumbnailPrompt, setThumbnailPrompt] = useState("");
   const [thumbnailGenerated, setThumbnailGenerated] = useState(false);
+  const [thumbnailModel, setThumbnailModel] = useState("gemini-3-pro");
   const [copied, setCopied] = useState("");
   const [step, setStep] = useState<"script" | "segments" | "options">("script");
   const [previewClip, setPreviewClip] = useState<number | null>(null);
-  const [targetDuration, setTargetDuration] = useState(60);
+  const [targetDuration, setTargetDuration] = useState(120);
+  const [language, setLanguage] = useState("English");
   const [playingPreset, setPlayingPreset] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
   const [musicPresets, setMusicPresets] = useState<MusicPreset[]>([]);
+  const [showFinalPreview, setShowFinalPreview] = useState(false);
+  const [showScript, setShowScript] = useState(false);
+  const [finalVideoTimestamp, setFinalVideoTimestamp] = useState(0);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [publishPrivacy, setPublishPrivacy] = useState<"private" | "unlisted" | "public">("private");
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [projectType, setProjectType] = useState<"youtube" | "custom">("youtube");
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
 
-  useEffect(() => { if (id && !project) loadProject(); }, [id]);
+  // Auto-save segments when they change
+  useEffect(() => {
+    if (!project?.id || segments.length === 0) return;
+    
+    // Clear previous timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounced save - wait 2 seconds after last change
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setSaving(true);
+        await projects.saveSegments(project.id, segments);
+        setLastSaved(new Date());
+      } catch (e) {
+        console.error("Failed to save segments:", e);
+      } finally {
+        setSaving(false);
+      }
+    }, 2000);
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [segments, project?.id]);
+
+  useEffect(() => { 
+    if (id) {
+      // Reset state when navigating to a different project
+      setProject(null);
+      setProjectType("youtube");
+      setSegments([]);
+      setStep("script");
+      setMediaAssets([]);
+      loadProject();
+    }
+    const animPref = localStorage.getItem("animated_subtitles");
+    if (animPref !== null) setMergeOptions(p => ({ ...p, animatedSubtitles: animPref === "true" }));
+  }, [id]);
+
+  useEffect(() => {
+    voice.getVoices().then(({ data }) => setVoices(data.voices || [])).catch(() => {});
+  }, []);
+
+  const playVoiceDemo = async (voiceId: string) => {
+    if (demoAudioRef.current) {
+      demoAudioRef.current.pause();
+      demoAudioRef.current = null;
+    }
+    if (playingDemo === voiceId) {
+      setPlayingDemo(null);
+      return;
+    }
+    setPlayingDemo(voiceId);
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const audio = new Audio(`${baseUrl}/voice/voice-demo/${voiceId}`);
+    demoAudioRef.current = audio;
+    audio.onended = () => setPlayingDemo(null);
+    audio.onerror = () => setPlayingDemo(null);
+    audio.play();
+  };
 
   const loadProject = useCallback(async () => {
     try {
       const { data } = await projects.get(id as string);
+      setProjectType(data.project_type || "youtube");
       setProject({
         id: data.id, videoId: data.video_id, title: data.title, thumbnail: data.thumbnail_url,
         duration: data.duration, transcript: data.transcript || [], summary: data.summary,
-        script: data.script, segments_data: data.segments_data, clips: [], status: data.status
+        script: data.script, segments_data: data.segments_data, clips: [], status: data.status,
+        prompt: data.prompt, project_type: data.project_type
       });
       if (data.script) setStep("segments");
+      
+      // Load media assets for custom projects and auto-assign to segments
+      if (data.project_type === "custom" && data.media_assets) {
+        const segs = data.segments_data || [];
+        const assignedMedia = data.media_assets.map((m: any, i: number) => {
+          // If already has timeline data, use it
+          if (m.startTime !== undefined && m.assignedSegments?.length > 0) return m;
+          // Otherwise auto-assign to segment by index
+          const segIdx = i < segs.length ? i : i % Math.max(segs.length, 1);
+          const seg = segs[segIdx];
+          return {
+            ...m,
+            startTime: seg?.start || i * 5,
+            endTime: seg?.end || (i + 1) * 5,
+            duration: seg ? (seg.end - seg.start) : 5,
+            assignedSegments: seg ? [segIdx] : []
+          };
+        });
+        setMediaAssets(assignedMedia);
+      }
       
       // Check existing files
       const { data: filesData } = await voice.checkExistingSegments(data.id);
       if (filesData.video_downloaded) setVideoDownloaded(true);
+      
+      if (data.thumbnail_generated) {
+        setThumbnailGenerated(true);
+        setThumbnailPrompt(data.thumbnail_prompt || "Previously generated");
+      }
+      
+      if (data.youtube_info) {
+        setYoutubeInfo({
+          title: data.youtube_info.title || "",
+          description: data.youtube_info.description || "",
+          tags: data.youtube_info.tags || ""
+        });
+      }
     } catch {}
   }, [id, setProject]);
 
+  // Load segments from DB when project data is available
   useEffect(() => {
-    const initSegments = async () => {
-      if (!project?.script || segments.length > 0) return;
+    if (!project?.id) return;
       
-      // Check for existing audio/clip files first
+    const loadSegments = async () => {
+      // Get existing audio/clip status
       let existingAudio: number[] = [];
       let existingClips: number[] = [];
       try {
@@ -79,48 +225,47 @@ export default function Workspace(): React.ReactElement {
         if (data.video_downloaded) setVideoDownloaded(true);
       } catch {}
       
-      // Use AI-generated segments from DB if available
+      // Load segments from DB
       if (project.segments_data && project.segments_data.length > 0) {
-        const aiSegments = project.segments_data.map((s: any, i: number) => ({
-          text: s.text,
+        const loadedSegments = project.segments_data.map((s: any, i: number) => {
+          let text = s.text || "";
+          let speaker = s.speaker || "";
+          let displayText = s.display_text || s.text || "";
+          
+          // Extract speaker from text if not in speaker field
+          if (!speaker && text.match(/^[A-Z][a-z]+:/)) {
+            const colonIdx = text.indexOf(":");
+            speaker = text.substring(0, colonIdx).trim();
+            text = text.substring(colonIdx + 1).trim();
+            displayText = s.text;
+          }
+          
+          return {
+            text,
+            displayText,
+            speaker,
           start: s.start || 0,
           end: s.end || 8,
           sourceStart: s.source_start || 0,
           sourceEnd: s.source_end || 10,
           audioGenerated: existingAudio.includes(i),
           clipExtracted: existingClips.includes(i),
-          timestamp: Date.now()
-        }));
-        setSegments(aiSegments);
-        return;
-      }
-      
-      // Fallback: split script into sentences (only if no AI segments)
-      const parts = project.script.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim());
-      const videoDur = project.duration || 300;
-      const segDur = Math.max(6, Math.floor(targetDuration / Math.min(parts.length, 10)));
-      
-      let currentTime = 0;
-      const newSegments = parts.slice(0, 10).map((text: string, i: number) => {
-        const start = currentTime;
-        const end = start + segDur;
-        currentTime = end;
-        return {
-          text,
-          start,
-          end,
-          sourceStart: Math.floor((i / 10) * videoDur),
-          sourceEnd: Math.floor(((i + 1) / 10) * videoDur),
-          audioGenerated: existingAudio.includes(i),
-          clipExtracted: existingClips.includes(i),
-          timestamp: Date.now()
+            timestamp: Date.now(),
+            voiceId: s.voice_id || "aria",
+            mediaId: s.media_id,
+            mediaType: s.media_type,
+            duration: s.duration || 8,
+            trimStart: s.trim_start,
+            trimEnd: s.trim_end,
+            effect: s.effect || "none"
         };
       });
-      setSegments(newSegments);
+        setSegments(loadedSegments);
+      }
     };
     
-    initSegments();
-  }, [project?.script, project?.segments_data]);
+    loadSegments();
+  }, [project?.id, project?.segments_data]);
 
   if (!project) {
     return (
@@ -132,22 +277,24 @@ export default function Workspace(): React.ReactElement {
   }
 
   const handleScript = async () => {
-    setProcessing(`Generating ${targetDuration}s script...`);
+    setProcessing(`Generating ${targetDuration}s script in ${language}...`);
     try {
-      const { data } = await ai.script(project.id, targetDuration);
+      const { data } = await ai.script(project.id, targetDuration, language);
       updateProject({ script: data.script });
       
       // Use AI-generated segments
       if (data.segments && data.segments.length > 0) {
         const aiSegments = data.segments.map((s: any) => ({
           text: s.text,
-          start: s.start || 0,           // Output timeline
+          start: s.start || 0,
           end: s.end || 8,
-          sourceStart: s.source_start || 0,  // Original video source
+          sourceStart: s.source_start || 0,
           sourceEnd: s.source_end || 10,
           audioGenerated: false,
           clipExtracted: false,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          voiceId: s.voice_id || "aria",
+          duration: s.duration || 8
         }));
         setSegments(aiSegments);
       }
@@ -168,7 +315,8 @@ export default function Workspace(): React.ReactElement {
   const handleGenerateSegment = async (index: number) => {
     setGeneratingIndex(index);
     try {
-      await voice.generateSegment(project.id, index, segments[index].text, selectedVoice, speed, stability);
+      const segmentVoice = segments[index].voiceId || selectedVoice;
+      await voice.generateSegment(project.id, index, segments[index].text, segmentVoice, speed, stability, selectedModel);
       setSegments(prev => prev.map((s, i) => i === index ? { ...s, audioGenerated: true, timestamp: Date.now() } : s));
     } catch {}
     setGeneratingIndex(null);
@@ -180,7 +328,8 @@ export default function Workspace(): React.ReactElement {
       if (!segments[i].audioGenerated) {
         setGeneratingIndex(i);
         try {
-          await voice.generateSegment(project.id, i, segments[i].text, selectedVoice, speed, stability);
+          const segmentVoice = segments[i].voiceId || selectedVoice;
+          await voice.generateSegment(project.id, i, segments[i].text, segmentVoice, speed, stability, selectedModel);
           setSegments(prev => prev.map((s, idx) => idx === i ? { ...s, audioGenerated: true, timestamp: Date.now() } : s));
         } catch {}
       }
@@ -196,6 +345,71 @@ export default function Workspace(): React.ReactElement {
       if (field === "sourceStart" || field === "sourceEnd") return { ...s, [field]: value, clipExtracted: false };
       return { ...s, [field]: value };
     }));
+  };
+
+  const handleAddSegment = (position: number) => {
+    const newSegment: Segment = {
+      text: "New segment text...",
+      start: 0,
+      end: 8,
+      sourceStart: Math.floor(currentTime),
+      sourceEnd: Math.floor(currentTime) + 10,
+      audioGenerated: false,
+      clipExtracted: false,
+      timestamp: 0,
+      voiceId: selectedVoice,
+      duration: 8
+    };
+    
+    setSegments(prev => {
+      const updated = [...prev];
+      updated.splice(position, 0, newSegment);
+      // Recalculate output timeline
+      let time = 0;
+      return updated.map(s => {
+        const duration = s.end - s.start || 8;
+        const start = time;
+        const end = time + duration;
+        time = end;
+        return { ...s, start, end };
+      });
+    });
+  };
+
+  const handleRemoveSegment = (index: number) => {
+    if (segments.length <= 1) return; // Keep at least one segment
+    setSegments(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      // Recalculate output timeline
+      let time = 0;
+      return updated.map(s => {
+        const duration = s.end - s.start || 8;
+        const start = time;
+        const end = time + duration;
+        time = end;
+        return { ...s, start, end };
+      });
+    });
+  };
+
+  const handleMoveSegment = (index: number, direction: "up" | "down") => {
+    if (direction === "up" && index === 0) return;
+    if (direction === "down" && index === segments.length - 1) return;
+    
+    setSegments(prev => {
+      const updated = [...prev];
+      const newIndex = direction === "up" ? index - 1 : index + 1;
+      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+      // Recalculate output timeline
+      let time = 0;
+      return updated.map(s => {
+        const duration = s.end - s.start || 8;
+        const start = time;
+        const end = time + duration;
+        time = end;
+        return { ...s, start, end };
+      });
+    });
   };
 
   const handleExtractClip = async (index: number) => {
@@ -229,7 +443,16 @@ export default function Workspace(): React.ReactElement {
   const handleMergeAll = async () => {
     setProcessing("Creating final video...");
     try {
-      await voice.mergeSegments(project.id, segments.length);
+      const { data: mergeData } = await voice.mergeSegments(project.id, segments.length);
+      
+      // Update segments with actual timing from audio
+      if (mergeData.timing && mergeData.timing.length > 0) {
+        setSegments(prev => prev.map((seg, i) => ({
+          ...seg,
+          start: mergeData.timing[i]?.start ?? seg.start,
+          end: mergeData.timing[i]?.end ?? seg.end
+        })));
+      }
       
       // Generate background music with ElevenLabs if selected
       if (mergeOptions.bgMusic) {
@@ -238,9 +461,37 @@ export default function Workspace(): React.ReactElement {
       }
       
       setProcessing("Merging video...");
+      
+      if (projectType === "custom" && mediaAssets.length > 0) {
+        // For custom projects: create video from media assets
+        const mediaTimeline = mediaAssets.map(m => ({
+          id: m.id,
+          startTime: m.startTime || 0,
+          endTime: m.endTime || 5,
+          assignedSegments: m.assignedSegments || []
+        }));
+        await video.createFromMedia(project.id, mediaTimeline, {
+          subtitles: mergeOptions.subtitles,
+          animatedSubtitles: mergeOptions.animatedSubtitles,
+          subtitleStyle: mergeOptions.subtitleStyle,
+          subtitleSize: mergeOptions.subtitleSize,
+          dialogueMode: mergeOptions.dialogueMode,
+          speaker1Position: mergeOptions.speaker1Position,
+          speaker2Position: mergeOptions.speaker2Position,
+          dialogueBgStyle: mergeOptions.dialogueBgStyle,
+          resize: mergeOptions.resize
+        });
+      } else {
+        // For YouTube projects: merge video clips
       await video.mergeWithOptions(project.id, segments, mergeOptions);
+      }
+      
       updateProject({ status: "completed" });
-    } catch {}
+      setFinalVideoTimestamp(Date.now());
+      setShowFinalPreview(true);
+    } catch (err) {
+      console.error("Merge failed:", err);
+    }
     setProcessing("");
   };
 
@@ -283,20 +534,28 @@ export default function Workspace(): React.ReactElement {
     }
   };
   
-  const handleGenerateThumbnail = async () => {
-    setProcessing("Generating AI thumbnail...");
+  const handleGeneratePrompt = async () => {
+    setProcessing("Generating thumbnail prompt...");
     try { 
-      const { data } = await video.generateThumbnail(project.id, project.script || ""); 
-      setThumbnailPrompt(data.thumbnail_prompt || "");
+      const { data } = await video.generateThumbnailPrompt(project.id, project.script || "", language);
+      setThumbnailPrompt(data.prompt || "");
+    } catch {}
+    setProcessing("");
+  };
+
+  const handleGenerateThumbnailFromPrompt = async (prompt: string, model: string) => {
+    setProcessing(`Generating thumbnail with ${model}...`);
+    try { 
+      const { data } = await video.generateThumbnailFromPrompt(project.id, prompt, model);
       setThumbnailGenerated(data.generated || false);
     } catch {}
     setProcessing("");
   };
 
   const handleGenerateYoutubeInfo = async () => {
-    setProcessing("Generating YouTube info...");
+    setProcessing(`Generating YouTube info in ${language}...`);
     try {
-      const { data } = await ai.generateYoutubeInfo(project.id, project.script || "");
+      const { data } = await ai.generateYoutubeInfo(project.id, project.script || "", language);
       setYoutubeInfo({
         title: data.title || project.title,
         description: data.description || "",
@@ -319,6 +578,60 @@ export default function Workspace(): React.ReactElement {
     setTimeout(() => setCopied(""), 2000);
   };
 
+  const handlePublish = async () => {
+    const accessToken = localStorage.getItem("youtube_token");
+    if (!accessToken) {
+      alert("Please connect your YouTube channel first (from the Connect page)");
+      return;
+    }
+    
+    if (!youtubeInfo.title) {
+      alert("Please generate YouTube info first");
+      return;
+    }
+    
+    setPublishing(true);
+    setProcessing("Publishing to YouTube...");
+    
+    try {
+      const { data } = await youtube.publish(
+        project.id,
+        youtubeInfo.title,
+        youtubeInfo.description,
+        youtubeInfo.tags,
+        publishPrivacy,
+        null,
+        accessToken
+      );
+      
+      if (data.success) {
+        setPublishedUrl(data.video_url);
+        alert(`✅ Video published successfully!\n\nVideo URL: ${data.video_url}\nThumbnail: ${data.thumbnail_uploaded ? "Uploaded" : "Not uploaded"}\nPrivacy: ${data.privacy}`);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || "Failed to publish";
+      if (msg.includes("quota") || msg.includes("403")) {
+        setQuotaExceeded(true);
+      } else if (msg.includes("401") || msg.includes("invalid_grant")) {
+        alert("YouTube session expired. Please reconnect your channel from the Connect page.");
+        localStorage.removeItem("youtube_token");
+        localStorage.removeItem("youtube_connected");
+      } else {
+        alert(`Error: ${msg}`);
+      }
+    }
+    
+    setPublishing(false);
+    setProcessing("");
+  };
+  
+  const handleCopyAll = () => {
+    const all = `Title:\n${youtubeInfo.title}\n\nDescription:\n${youtubeInfo.description}\n\nTags:\n${youtubeInfo.tags}`;
+    navigator.clipboard.writeText(all);
+    setCopied("all");
+    setTimeout(() => setCopied(""), 2000);
+  };
+
   const allAudioGenerated = segments.length > 0 && segments.every(s => s.audioGenerated);
   const allClipsExtracted = segments.length > 0 && segments.every(s => s.clipExtracted);
 
@@ -331,8 +644,19 @@ export default function Workspace(): React.ReactElement {
               <ArrowLeft className="w-5 h-5 text-[#666]" />
             </Link>
             <div className="min-w-0">
+              <div className="flex items-center gap-2">
               <h1 className="text-base font-semibold text-[#1a1a1a] truncate max-w-sm">{project.title}</h1>
-              <p className="text-xs text-[#999]">{project.duration}s • {project.videoId}</p>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                  projectType === "custom" ? "bg-purple-100 text-purple-600" : "bg-red-100 text-red-600"
+                }`}>
+                  {projectType === "custom" ? "Custom" : "YouTube"}
+                </span>
+              </div>
+              <p className="text-xs text-[#999]">
+                {project.duration ? `${project.duration}s` : ""}
+                {project.duration && project.videoId ? " • " : ""}
+                {project.videoId || (projectType === "custom" ? "Script-based project" : "")}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -347,6 +671,7 @@ export default function Workspace(): React.ReactElement {
 
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="space-y-4">
+            {projectType === "youtube" ? (
             <div className="card p-0 overflow-hidden">
               <div className="aspect-video bg-black">
                 <ReactPlayer url={`https://youtube.com/watch?v=${project.videoId}`} width="100%" height="100%" controls
@@ -360,30 +685,44 @@ export default function Workspace(): React.ReactElement {
                 </button>
               </div>
             </div>
-
-            {step !== "script" && (
-              <div className="card">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Settings className="w-4 h-4" /> Voice Settings</h3>
-                <select value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)} className="input mb-2">
-                  <option value="sarah">Sarah (Female)</option>
-                  <option value="alice">Alice (Female)</option>
-                  <option value="laura">Laura (Female)</option>
-                  <option value="roger">Roger (Male)</option>
-                  <option value="charlie">Charlie (Male)</option>
-                  <option value="george">George (Male)</option>
-                  <option value="liam">Liam (Male)</option>
-                </select>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-[#666]">Speed: {speed.toFixed(1)}x</label>
-                    <input type="range" min="0.5" max="2" step="0.1" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full" />
+            ) : (
+              <div className="card p-6 bg-gradient-to-br from-purple-50 to-blue-50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-purple-600" />
                   </div>
                   <div>
-                    <label className="text-xs text-[#666]">Stability: {(stability * 100).toFixed(0)}%</label>
-                    <input type="range" min="0" max="1" step="0.1" value={stability} onChange={(e) => setStability(parseFloat(e.target.value))} className="w-full" />
-                  </div>
+                    <h3 className="font-bold text-slate-900">Custom Script Project</h3>
+                    <p className="text-xs text-slate-500">Create video from scratch</p>
+                </div>
+                        </div>
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="bg-white p-3 rounded-lg">
+                    <span className="text-2xl font-bold text-purple-600">{segments.length}</span>
+                    <p className="text-xs text-slate-500">Segments</p>
+                      </div>
+                  <div className="bg-white p-3 rounded-lg">
+                    <span className="text-2xl font-bold text-blue-600">{mediaAssets.length}</span>
+                    <p className="text-xs text-slate-500">Media</p>
+                </div>
                 </div>
               </div>
+            )}
+
+            {step !== "script" && (
+              <VoiceSettings
+                voices={voices}
+                selectedVoice={selectedVoice}
+                onSelectVoice={setSelectedVoice}
+                selectedModel={selectedModel}
+                onSelectModel={setSelectedModel}
+                speed={speed}
+                onSpeedChange={setSpeed}
+                stability={stability}
+                onStabilityChange={setStability}
+                playingDemo={playingDemo}
+                onPlayDemo={playVoiceDemo}
+              />
             )}
           </div>
 
@@ -396,31 +735,72 @@ export default function Workspace(): React.ReactElement {
               </div>
             )}
 
-            {step === "script" && (
+            {step === "script" && projectType === "custom" && (
+              <CustomScriptEditor
+                projectId={project.id}
+                initialPrompt={project.prompt}
+                initialScript={project.script}
+                initialDuration={project.duration}
+                onScriptGenerated={(script, segs) => {
+                  updateProject({ script });
+                  const newSegments = segs.map((s: any) => ({
+                    text: s.text,  // Clean text for TTS
+                    displayText: s.display_text || s.text,  // Text with speaker for UI
+                    speaker: s.speaker || "",  // Speaker name
+                    start: s.start || 0, end: s.end || 8,
+                    sourceStart: 0, sourceEnd: 0, audioGenerated: false, clipExtracted: true,
+                    timestamp: Date.now(), voiceId: s.voice_id || "aria", duration: s.duration || 8
+                  }));
+                  setSegments(newSegments);
+                  setStep("segments");
+                }}
+              />
+            )}
+
+            {step === "script" && projectType === "youtube" && (
               <div className="card">
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><FileText className="w-4 h-4" /> Step 1: Generate Script</h3>
                 
-                <div className="mb-4">
-                  <label className="text-xs text-[#666] block mb-2">Target Duration (seconds)</label>
-                  <div className="flex gap-2">
-                    {[30, 60, 90].map(d => (
-                      <button key={d} onClick={() => setTargetDuration(d)}
-                        className={`py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                          targetDuration === d ? 'bg-[#1a1a1a] text-white' : 'bg-[#f5f5f5] text-[#666] hover:bg-[#e5e5e5]'
-                        }`}>
-                        {d}s
-                      </button>
-                    ))}
-                    <input 
-                      type="number" 
-                      value={targetDuration} 
-                      onChange={(e) => setTargetDuration(Math.max(15, Math.min(300, +e.target.value)))}
-                      className="w-20 py-2 px-3 rounded-lg text-sm font-medium text-center border border-[#e5e5e5] focus:border-[#1a1a1a] focus:outline-none"
-                      placeholder="Custom"
-                    />
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs text-[#666] block mb-2">Target Duration</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[60, 120, 180, 300, 600].map(d => (
+                        <button key={d} onClick={() => setTargetDuration(d)}
+                          className={`py-1.5 px-2.5 rounded-lg text-xs font-medium transition-all ${
+                            targetDuration === d ? 'bg-[#1a1a1a] text-white' : 'bg-[#f5f5f5] text-[#666] hover:bg-[#e5e5e5]'
+                          }`}>
+                          {d < 60 ? `${d}s` : `${Math.floor(d / 60)}m`}
+                        </button>
+                      ))}
+                      <input 
+                        type="number" 
+                        value={targetDuration} 
+                        onChange={(e) => setTargetDuration(Math.max(30, Math.min(900, +e.target.value)))}
+                        className="w-16 py-1.5 px-2 rounded-lg text-xs font-medium text-center border border-[#e5e5e5] focus:border-[#1a1a1a] focus:outline-none"
+                        placeholder="Custom"
+                      />
+                    </div>
                   </div>
-                  <p className="text-xs text-[#999] mt-2">Original: {project.duration}s → Output: {targetDuration}s</p>
+                  <div>
+                    <label className="text-xs text-[#666] block mb-2">Output Language</label>
+                    <select 
+                      value={language} 
+                      onChange={(e) => setLanguage(e.target.value)}
+                      className="w-full py-2 px-3 rounded-lg text-sm border border-[#e5e5e5] focus:border-[#1a1a1a] focus:outline-none bg-white"
+                    >
+                      <option value="English">🇺🇸 English</option>
+                      <option value="Spanish">🇪🇸 Spanish</option>
+                      <option value="Bengali">🇧🇩 Bengali</option>
+                      <option value="Hindi">🇮🇳 Hindi</option>
+                      <option value="Arabic">🇸🇦 Arabic</option>
+                      <option value="Chinese">🇨🇳 Chinese</option>
+                      <option value="Japanese">🇯🇵 Japanese</option>
+                      <option value="Korean">🇰🇷 Korean</option>
+                    </select>
+                  </div>
                 </div>
+                <p className="text-xs text-[#999] mb-4">Original: {Math.floor((project.duration || 0) / 60)}m {(project.duration || 0) % 60}s → Output: {Math.floor(targetDuration / 60)}m {targetDuration % 60}s in {language}</p>
 
                 {project.script ? (
                   <div className="space-y-3">
@@ -447,14 +827,25 @@ export default function Workspace(): React.ReactElement {
             {step === "segments" && (
               <div className="card">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-sm flex items-center gap-2"><Clock className="w-4 h-4" /> Step 2: Segments</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm flex items-center gap-2"><Clock className="w-4 h-4" /> Step 2: Segments</h3>
+                    <span className="text-[10px] text-slate-400">
+                      {saving ? (
+                        <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>
+                      ) : lastSaved ? (
+                        <span className="text-green-600">✓ Saved</span>
+                      ) : null}
+                    </span>
+                  </div>
                   <div className="flex gap-2">
+                    {projectType === "youtube" && (
                     <button onClick={handleExtractAllClips} disabled={!!processing || !videoDownloaded || allClipsExtracted} 
                       className={`text-xs py-1.5 px-3 rounded-lg flex items-center gap-1.5 font-medium transition-all ${
                         allClipsExtracted ? 'bg-emerald-500 text-white' : 'bg-[#1a1a1a] text-white hover:bg-[#333] disabled:opacity-40'
                       }`}>
                       <Scissors className="w-3.5 h-3.5" /> {allClipsExtracted ? "All Clips ✓" : "All Clips"}
                     </button>
+                    )}
                     <button onClick={handleGenerateAll} disabled={!!processing || allAudioGenerated} 
                       className={`text-xs py-1.5 px-3 rounded-lg flex items-center gap-1.5 font-medium transition-all ${
                         allAudioGenerated ? 'bg-emerald-500 text-white' : 'bg-[#1a1a1a] text-white hover:bg-[#333] disabled:opacity-40'
@@ -463,227 +854,254 @@ export default function Workspace(): React.ReactElement {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-3 max-h-80 overflow-y-auto">
+                
+                {project.script && (
+                  <div className="mb-3">
+                    <button onClick={() => setShowScript(!showScript)}
+                      className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 flex items-center justify-between transition-all">
+                      <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5" /> View Full Script</span>
+                      <span className="text-slate-400">{showScript ? "▲" : "▼"}</span>
+                    </button>
+                    {showScript && (
+                      <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
+                        <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{project.script}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {projectType === "custom" && (
+                  <div className="mb-4 space-y-3">
+                    <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <MediaManager
+                        projectId={project.id}
+                        mediaAssets={mediaAssets}
+                        onMediaChange={setMediaAssets}
+                        script={project.script}
+                        segments={segments}
+                        totalDuration={segments.reduce((acc, s) => Math.max(acc, s.end), 0)}
+                      />
+                    </div>
+                    
+                    {mediaAssets.length > 0 && segments.length > 0 && (
+                      <button
+                        onClick={() => {
+                          // Auto-distribute media across segments
+                          const updated = segments.map((seg, i) => {
+                            const mediaIndex = i % mediaAssets.length;
+                            return { ...seg, mediaId: mediaAssets[mediaIndex].id };
+                          });
+                          setSegments(updated);
+                        }}
+                        className="w-full py-2 text-xs font-medium bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-all flex items-center justify-center gap-1"
+                      >
+                        🔄 Auto-Distribute Media to Segments
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {/* Add segment at start */}
+                  <button 
+                    onClick={() => handleAddSegment(0)}
+                    className="w-full py-1.5 border border-dashed border-slate-300 rounded-lg text-xs text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add segment at start
+                  </button>
+
                   {segments.map((seg, i) => (
-                    <div key={i} className={`p-3 border rounded-lg ${seg.audioGenerated && seg.clipExtracted ? 'border-green-300 bg-green-50' : seg.audioGenerated || seg.clipExtracted ? 'border-blue-300 bg-blue-50' : 'border-[#e5e5e5]'}`}>
+                    <div key={i} className={`p-3 border rounded-lg relative group ${seg.audioGenerated && seg.clipExtracted ? 'border-green-200 bg-green-50/50' : seg.audioGenerated || seg.clipExtracted ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
+                      {/* Segment header with number and controls */}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="w-6 h-6 flex items-center justify-center bg-[#1a1a1a] text-white text-xs rounded shrink-0">{i + 1}</span>
-                        <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
-                          <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded">
-                            <span className="text-blue-600 font-medium">Source:</span>
-                            <input type="number" value={seg.sourceStart} onChange={(e) => handleUpdateSegment(i, "sourceStart", +e.target.value)}
-                              className="w-12 px-1 py-0.5 border rounded text-center" />
-                            <span>-</span>
-                            <input type="number" value={seg.sourceEnd} onChange={(e) => handleUpdateSegment(i, "sourceEnd", +e.target.value)}
-                              className="w-12 px-1 py-0.5 border rounded text-center" />
-                            <span className="text-[#999]">s</span>
-                          </div>
-                          <div className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
-                            <span className="text-green-600 font-medium">Output:</span>
-                            <span>{seg.start}s - {seg.end}s</span>
-                            <span className="text-[#999]">({seg.end - seg.start}s)</span>
+                        <div className="flex items-center gap-1">
+                          <span className="w-5 h-5 flex items-center justify-center bg-slate-900 text-white text-[10px] font-medium rounded">{i + 1}</span>
+                          <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => handleMoveSegment(i, "up")} 
+                              disabled={i === 0}
+                              className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                            </button>
+                            <button 
+                              onClick={() => handleMoveSegment(i, "down")} 
+                              disabled={i === segments.length - 1}
+                              className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
                           </div>
                         </div>
+                        
+                        <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded">
+                            <span className="text-blue-600 font-medium text-[10px]">Source:</span>
+                            <input type="number" value={seg.sourceStart} onChange={(e) => handleUpdateSegment(i, "sourceStart", +e.target.value)}
+                              className="w-10 px-1 py-0.5 border border-slate-200 rounded text-center text-[10px]" />
+                            <span className="text-slate-400">-</span>
+                            <input type="number" value={seg.sourceEnd} onChange={(e) => handleUpdateSegment(i, "sourceEnd", +e.target.value)}
+                              className="w-10 px-1 py-0.5 border border-slate-200 rounded text-center text-[10px]" />
+                            <span className="text-slate-400 text-[10px]">s</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
+                            <span className="text-green-600 font-medium text-[10px]">Out:</span>
+                            <span className="text-[10px]">{seg.start}s - {seg.end}s</span>
+                          </div>
+                        </div>
+                        
                         <button onClick={() => { handleUpdateSegment(i, "sourceStart", Math.floor(currentTime)); }}
-                          className="text-xs text-blue-600 hover:underline shrink-0">Set</button>
+                          className="text-[10px] text-blue-600 hover:underline shrink-0 px-1.5 py-0.5 bg-blue-50 rounded">Set</button>
+                        
+                        <VoiceSelector
+                          voices={voices}
+                          selectedVoice={seg.voiceId || selectedVoice}
+                          onSelect={(voiceId) => handleUpdateSegment(i, "voiceId", voiceId)}
+                          compact={true}
+                        />
+                        
+                        <button 
+                          onClick={() => handleRemoveSegment(i)}
+                          disabled={segments.length <= 1}
+                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all disabled:opacity-30"
+                          title="Remove segment"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+                      
+                      {seg.speaker && (
+                        <span className="inline-block text-[10px] font-semibold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded mb-1">
+                          {seg.speaker}
+                        </span>
+                      )}
                       <textarea value={seg.text} onChange={(e) => handleUpdateSegment(i, "text", e.target.value)}
-                        className="w-full text-xs p-2 border rounded resize-none mb-2" rows={2} />
+                        className="w-full text-xs p-2 border border-slate-200 rounded resize-none mb-2 focus:border-slate-400 focus:outline-none" rows={2} placeholder="Segment text..." />
+                      
+                      {/* Media & Effect Row - only for custom projects */}
+                      {projectType === "custom" && (
+                        <div className="flex items-center gap-2 mb-2">
+                          {mediaAssets.length > 0 && (
+                            <select
+                              value={seg.mediaId || ""}
+                              onChange={(e) => handleUpdateSegment(i, "mediaId", e.target.value)}
+                              className="text-[10px] px-2 py-1.5 border border-slate-200 rounded bg-white flex-1"
+                            >
+                              <option value="">🖼️ Default Image</option>
+                              {mediaAssets.map((m, mi) => (
+                                <option key={m.id} value={m.id}>
+                                  🖼️ {m.source === "ai_generated" ? "AI" : "Upload"} #{mi + 1}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <select
+                            value={seg.effect || "none"}
+                            onChange={(e) => handleUpdateSegment(i, "effect", e.target.value)}
+                            className="text-[10px] px-2 py-1.5 border border-slate-200 rounded bg-white flex-1"
+                          >
+                            <option value="none">✨ No Effect</option>
+                            <option value="fade">✨ Fade In/Out</option>
+                            <option value="pop">✨ Pop In</option>
+                            <option value="slide">✨ Slide</option>
+                            <option value="zoom">✨ Zoom</option>
+                          </select>
+                        </div>
+                      )}
+                      
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => handleExtractClip(i)} disabled={extractingIndex !== null || generatingIndex !== null || !videoDownloaded}
-                          className={`text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 font-medium transition-all ${
+                          className={`text-xs py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 font-medium transition-all ${
                             extractingIndex === i ? 'bg-blue-600 text-white' :
-                            seg.clipExtracted ? 'bg-emerald-500 text-white shadow-sm' : 
-                            'bg-[#1a1a1a] text-white hover:bg-[#333] disabled:opacity-40'
+                            seg.clipExtracted ? 'bg-emerald-500 text-white' : 
+                            'bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-40'
                           }`}>
-                          {extractingIndex === i ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scissors className="w-3.5 h-3.5" />}
-                          {extractingIndex === i ? "Cutting..." : seg.clipExtracted ? "Clip ✓" : "Cut Clip"}
+                          {extractingIndex === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Scissors className="w-3 h-3" />}
+                          {extractingIndex === i ? "..." : seg.clipExtracted ? "✓" : "Clip"}
                         </button>
                         <button onClick={() => handleGenerateSegment(i)} disabled={generatingIndex !== null || extractingIndex !== null}
-                          className={`text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 font-medium transition-all ${
+                          className={`text-xs py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 font-medium transition-all ${
                             generatingIndex === i ? 'bg-blue-600 text-white' :
-                            seg.audioGenerated ? 'bg-emerald-500 text-white shadow-sm' : 
-                            'bg-[#1a1a1a] text-white hover:bg-[#333] disabled:opacity-40'
+                            seg.audioGenerated ? 'bg-emerald-500 text-white' : 
+                            'bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-40'
                           }`}>
-                          {generatingIndex === i ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                          {generatingIndex === i ? "Generating..." : seg.audioGenerated ? "Audio ✓" : "Generate"}
+                          {generatingIndex === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                          {generatingIndex === i ? "..." : seg.audioGenerated ? "✓" : "Audio"}
                         </button>
                       </div>
+                      
                       {seg.clipExtracted && (
                         <button onClick={() => setPreviewClip(previewClip === i ? null : i)} 
-                          className={`w-full text-xs py-1 mt-2 rounded flex items-center justify-center gap-1 ${previewClip === i ? 'bg-blue-100 text-blue-700' : 'text-[#666] hover:bg-[#f5f5f5]'}`}>
-                          <Video className="w-3 h-3" />{previewClip === i ? "Hide Preview" : "Show Clip Preview"}
+                          className={`w-full text-[10px] py-1 mt-2 rounded flex items-center justify-center gap-1 ${previewClip === i ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100'}`}>
+                          <Video className="w-3 h-3" />{previewClip === i ? "Hide" : "Preview"}
                         </button>
                       )}
                       {previewClip === i && seg.clipExtracted && (
-                        <div className="mt-2 bg-black rounded-lg overflow-hidden">
-                          <video controls autoPlay className="w-full h-40" src={video.previewClip(project.id, i, seg.timestamp)} />
+                        <div className="mt-2 bg-black rounded overflow-hidden">
+                          <video controls autoPlay className="w-full h-32" src={video.previewClip(project.id, i, seg.timestamp)} />
                         </div>
                       )}
                       {seg.audioGenerated && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <audio controls className="flex-1 h-8" key={seg.timestamp} src={voice.previewSegment(project.id, i, seg.timestamp)} />
+                        <div className="flex items-center gap-1 mt-2">
+                          <audio controls className="flex-1 h-7" key={seg.timestamp} src={voice.previewSegment(project.id, i, seg.timestamp)} />
                           <button onClick={() => handleGenerateSegment(i)} disabled={generatingIndex !== null} 
-                            className="p-1.5 rounded hover:bg-[#f5f5f5] text-[#666]" title="Regenerate audio">
-                            <RefreshCw className="w-3.5 h-3.5" />
+                            className="p-1 rounded hover:bg-slate-100 text-slate-500" title="Regenerate">
+                            <RefreshCw className="w-3 h-3" />
                           </button>
                         </div>
                       )}
+                      
+                      {/* Add segment after this one */}
+                      <button 
+                        onClick={() => handleAddSegment(i + 1)}
+                        className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all opacity-0 group-hover:opacity-100 shadow-sm z-10"
+                        title="Add segment here"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setStep("options")} disabled={!allAudioGenerated || !allClipsExtracted} className="btn-primary w-full mt-3 disabled:opacity-50">
+                <button onClick={() => setStep("options")} disabled={!allAudioGenerated || (projectType === "youtube" && !allClipsExtracted)} className="btn-primary w-full mt-3 disabled:opacity-50">
                   Continue to Options →
                 </button>
               </div>
             )}
 
             {step === "options" && (
-              <div className="card">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Merge className="w-4 h-4" /> Step 3: Merge Options</h3>
-                <div className="space-y-4 mb-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={mergeOptions.subtitles} onChange={(e) => setMergeOptions(p => ({ ...p, subtitles: e.target.checked }))} className="w-4 h-4" />
-                    <span className="text-sm">Include Subtitles</span>
-                  </label>
-                  
-                  <div>
-                    <label className="text-xs text-[#666] block mb-1">Aspect Ratio</label>
-                    <select value={mergeOptions.resize} onChange={(e) => setMergeOptions(p => ({ ...p, resize: e.target.value }))} className="input">
-                      <option value="16:9">16:9 (Landscape)</option>
-                      <option value="9:16">9:16 (Shorts/Vertical)</option>
-                      <option value="1:1">1:1 (Square)</option>
-                    </select>
-                  </div>
-
-                  <div className="border-t pt-3">
-                    <label className="text-xs text-[#666] flex items-center gap-1 mb-2"><Music className="w-3 h-3" /> Background Music (Royalty-Free)</label>
-                    
-                    {mergeOptions.bgMusic ? (
-                      <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-3 rounded-lg border border-purple-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-purple-700">
-                            🎵 {musicPresets.find(p => p.id === mergeOptions.bgMusic)?.name || mergeOptions.bgMusic}
-                          </span>
-                          <button onClick={handleRemoveMusic} className="text-red-500 hover:bg-red-50 p-1 rounded"><X className="w-4 h-4" /></button>
-                        </div>
-                        <div>
-                          <label className="text-xs text-[#666]">Volume: {Math.round(mergeOptions.bgMusicVolume * 100)}%</label>
-                          <input type="range" min="0.1" max="0.5" step="0.05" value={mergeOptions.bgMusicVolume} 
-                            onChange={(e) => setMergeOptions(p => ({ ...p, bgMusicVolume: parseFloat(e.target.value) }))} className="w-full accent-purple-500" />
-                        </div>
-                        <p className="text-[10px] text-purple-500 mt-1">🔄 Music will loop automatically to match video length</p>
-                      </div>
-                    ) : (
-                      <button onClick={handleOpenMusicSheet} 
-                        className="w-full py-3 border-2 border-dashed border-[#ccc] rounded-lg text-sm text-[#666] hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all flex items-center justify-center gap-2">
-                        <Music className="w-4 h-4" /> Choose Background Music
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <button onClick={handleMergeAll} disabled={!videoDownloaded || !!processing} className="btn-primary w-full disabled:opacity-50">
-                    <Merge className="w-4 h-4" /> Create Final Video
-                  </button>
-                  
-                  {project.status === "completed" && (
-                    <div className="space-y-3 pt-3 border-t">
-                      <div className="flex gap-2">
-                        <button onClick={handleGenerateThumbnail} disabled={!!processing} className="btn-secondary flex-1">
-                          <Image className="w-4 h-4" /> {thumbnailPrompt ? "Regen" : "AI Thumbnail"}
-                        </button>
-                        <a href={video.downloadFinal(project.id)} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                          <Download className="w-4 h-4" /> Download
-                        </a>
-                      </div>
-                      
-                      {thumbnailPrompt && (
-                        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-3 rounded-lg border border-purple-200">
-                          {thumbnailGenerated && (
-                            <div className="mb-3">
-                              <img 
-                                src={video.getThumbnail(project.id, Date.now())} 
-                                alt="Generated Thumbnail" 
-                                className="w-full rounded-lg shadow-md"
-                              />
-                              <a 
-                                href={video.getThumbnail(project.id)} 
-                                download="thumbnail.jpg"
-                                className="mt-2 w-full btn-secondary text-xs flex items-center justify-center gap-1"
-                              >
-                                <Download className="w-3 h-3" /> Download Thumbnail
-                              </a>
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-xs font-medium text-purple-700 flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" /> {thumbnailGenerated ? "Generated with AI" : "AI Prompt (manual use)"}
-                            </label>
-                            <button onClick={() => copyToClipboard(thumbnailPrompt, "thumbnail")} className="text-xs text-purple-600 flex items-center gap-1">
-                              {copied === "thumbnail" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                              {copied === "thumbnail" ? "Copied!" : "Copy Prompt"}
-                            </button>
-                          </div>
-                          <details className="text-xs text-[#666]">
-                            <summary className="cursor-pointer text-purple-600 hover:underline">View prompt</summary>
-                            <p className="mt-2 leading-relaxed">{thumbnailPrompt}</p>
-                          </details>
-                        </div>
-                      )}
-                      
-                      <div className="border-t pt-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-semibold flex items-center gap-1"><Youtube className="w-4 h-4 text-red-500" /> YouTube Upload Info</h4>
-                          <button onClick={handleGenerateYoutubeInfo} disabled={!!processing} className="text-xs text-blue-600 hover:underline">
-                            {youtubeInfo.title ? "Regenerate" : "Generate"}
-                          </button>
-                        </div>
-                        
-                        {youtubeInfo.title && (
-                          <div className="space-y-2">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-xs text-[#666]">Title</label>
-                                <button onClick={() => copyToClipboard(youtubeInfo.title, "title")} className="text-xs text-blue-600 flex items-center gap-1">
-                                  {copied === "title" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {copied === "title" ? "Copied!" : "Copy"}
-                                </button>
-                              </div>
-                              <input value={youtubeInfo.title} onChange={(e) => setYoutubeInfo(p => ({ ...p, title: e.target.value }))}
-                                className="w-full text-xs p-2 border rounded" />
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-xs text-[#666]">Description</label>
-                                <button onClick={() => copyToClipboard(youtubeInfo.description, "desc")} className="text-xs text-blue-600 flex items-center gap-1">
-                                  {copied === "desc" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {copied === "desc" ? "Copied!" : "Copy"}
-                                </button>
-                              </div>
-                              <textarea value={youtubeInfo.description} onChange={(e) => setYoutubeInfo(p => ({ ...p, description: e.target.value }))}
-                                className="w-full text-xs p-2 border rounded resize-none" rows={4} />
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-xs text-[#666]">Tags (comma separated)</label>
-                                <button onClick={() => copyToClipboard(youtubeInfo.tags, "tags")} className="text-xs text-blue-600 flex items-center gap-1">
-                                  {copied === "tags" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {copied === "tags" ? "Copied!" : "Copy"}
-                                </button>
-                              </div>
-                              <input value={youtubeInfo.tags} onChange={(e) => setYoutubeInfo(p => ({ ...p, tags: e.target.value }))}
-                                className="w-full text-xs p-2 border rounded" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <>
+                <MergeOptionsStep
+                  mergeOptions={mergeOptions}
+                  setMergeOptions={setMergeOptions}
+                  musicPresets={musicPresets}
+                  onOpenMusicSheet={handleOpenMusicSheet}
+                  onRemoveMusic={handleRemoveMusic}
+                  onMergeAll={handleMergeAll}
+                  processing={processing}
+                  videoDownloaded={videoDownloaded}
+                  projectType={projectType}
+                />
+                
+                <FinalVideoSection
+                  projectId={project.id}
+                  projectStatus={project.status}
+                  language={language}
+                  script={project.script || ""}
+                  onGeneratePrompt={handleGeneratePrompt}
+                  onGenerateThumbnailFromPrompt={handleGenerateThumbnailFromPrompt}
+                  setThumbnailPrompt={setThumbnailPrompt}
+                  onGenerateYoutubeInfo={handleGenerateYoutubeInfo}
+                  processing={processing}
+                  thumbnailPrompt={thumbnailPrompt}
+                  thumbnailGenerated={thumbnailGenerated}
+                  thumbnailModel={thumbnailModel}
+                  setThumbnailModel={setThumbnailModel}
+                  youtubeInfo={youtubeInfo}
+                  setYoutubeInfo={setYoutubeInfo}
+                  showFinalPreview={showFinalPreview}
+                  setShowFinalPreview={setShowFinalPreview}
+                  finalVideoTimestamp={finalVideoTimestamp}
+                />
+              </>
             )}
 
             <div className="flex gap-2">
@@ -698,67 +1116,16 @@ export default function Workspace(): React.ReactElement {
       {/* Hidden audio element for previews */}
       <audio ref={audioRef} onEnded={() => setPlayingPreset(null)} />
 
-      {/* Music Selection Modal */}
-      {showMusicSheet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { audioRef.current?.pause(); setPlayingPreset(null); setShowMusicSheet(false); }} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-5 py-4 flex items-center justify-between">
-              <h3 className="font-bold text-white flex items-center gap-2"><Music className="w-5 h-5" /> AI Background Music</h3>
-              <button onClick={() => { audioRef.current?.pause(); setPlayingPreset(null); setShowMusicSheet(false); }} className="p-2 hover:bg-white/20 rounded-full text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <p className="text-xs text-[#666] px-5 py-3 bg-[#f5f5f5] border-b flex items-center gap-2">
-              <Volume2 className="w-3.5 h-3.5" /> Click play to preview • Powered by ElevenLabs
-            </p>
-            
-            {/* Preset List */}
-            <div className="p-4 space-y-2 max-h-[50vh] overflow-y-auto">
-              {musicPresets.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-[#999]">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading...
-                </div>
-              ) : musicPresets.map(preset => (
-                <div key={preset.id} 
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    mergeOptions.bgMusic === preset.id 
-                      ? 'bg-purple-100 border-2 border-purple-500' 
-                      : 'bg-[#f5f5f5] hover:bg-[#eee] border-2 border-transparent'
-                  }`}>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handlePreviewMusic(preset.id); }}
-                    disabled={loadingPreview === preset.id}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all ${
-                      loadingPreview === preset.id ? 'bg-yellow-100' :
-                      playingPreset === preset.id ? 'bg-purple-600 text-white animate-pulse' : 
-                      'bg-white hover:bg-purple-100'
-                    }`}>
-                    {loadingPreview === preset.id ? <Loader2 className="w-5 h-5 animate-spin text-yellow-600" /> :
-                     playingPreset === preset.id ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-                  </button>
-                  <div className="flex-1 cursor-pointer" onClick={() => handleSelectMusic(preset)}>
-                    <p className="font-medium text-sm">{preset.name}</p>
-                    <p className="text-xs text-[#999]">{preset.cached ? "✓ Ready" : "Will generate on play"}</p>
-                  </div>
-                  {mergeOptions.bgMusic === preset.id && <Check className="w-5 h-5 text-purple-500" />}
-                </div>
-              ))}
-            </div>
-            
-            {/* Footer */}
-            <div className="border-t px-5 py-3 flex items-center justify-between bg-[#fafafa]">
-              <span className="text-xs text-[#999]">🔄 Auto-loops to match video</span>
-              <button onClick={() => { audioRef.current?.pause(); setPlayingPreset(null); setShowMusicSheet(false); }}
-                className="px-5 py-2 bg-[#1a1a1a] text-white text-sm font-medium rounded-lg hover:bg-[#333]">
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MusicSheet
+        isOpen={showMusicSheet}
+        onClose={() => { audioRef.current?.pause(); setPlayingPreset(null); setShowMusicSheet(false); }}
+        musicPresets={musicPresets}
+        selectedMusic={mergeOptions.bgMusic}
+        onSelect={(presetId) => setMergeOptions(p => ({ ...p, bgMusic: presetId }))}
+        playingPreset={playingPreset}
+        loadingPreview={loadingPreview}
+        onPreview={handlePreviewMusic}
+      />
     </div>
   );
 }

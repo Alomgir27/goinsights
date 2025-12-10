@@ -22,16 +22,19 @@ interface SegmentData {
 
 interface Project {
   id: string;
-  videoId: string;
+  project_type?: "youtube" | "custom";
+  videoId?: string;
   title: string;
-  thumbnail: string;
+  thumbnail?: string;
   duration: number;
-  transcript: TranscriptItem[];
+  transcript?: TranscriptItem[];
   summary?: string;
   script?: string;
+  prompt?: string;
   segments_data?: SegmentData[];
   clips: Clip[];
   status: string;
+  animatedSubtitles?: boolean;
 }
 
 interface AppStore {

@@ -2,22 +2,59 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
-  timeout: 120000
+  timeout: 300000  // 5 mins for long video processing
 });
 
 interface ClipData { start: number; end: number; }
 
 export const youtube = {
   extract: (url: string) => api.post("/youtube/extract", { url }),
-  transcribe: (projectId: string) => api.post(`/youtube/transcribe/${projectId}`),
-  getTranscriptionStatus: (projectId: string) => api.get(`/youtube/transcription-status/${projectId}`)
+  getAuthUrl: () => api.get("/youtube/auth-url"),
+  handleCallback: (code: string) => api.post("/youtube/auth-callback", { code }),
+  getChannelVideos: () => api.get("/youtube/channel-videos"),
+  getSuggestions: () => api.get("/youtube/suggestions"),
+  searchVideos: (query: string) => api.get(`/youtube/search?q=${encodeURIComponent(query)}`),
+  searchChannels: (query: string) => api.get(`/youtube/channel/search?q=${encodeURIComponent(query)}`),
+  getChannelById: (channelId: string) => api.get(`/youtube/channel/${channelId}/videos`),
+  getPlaylists: (accessToken: string) => api.post("/youtube/playlists", { access_token: accessToken }),
+  publish: (projectId: string, title: string, description: string, tags: string, privacy: string, playlistId: string | null, accessToken: string) =>
+    api.post("/youtube/publish", { project_id: projectId, title, description, tags, privacy, playlist_id: playlistId, access_token: accessToken }),
 };
 
 export const ai = {
   summarize: (projectId: string, style: string) => api.post("/ai/summarize", { project_id: projectId, style }),
   ask: (projectId: string, question: string) => api.post("/ai/ask", { project_id: projectId, question }),
-  script: (projectId: string, duration: number) => api.post("/ai/script", { project_id: projectId, duration_seconds: duration }),
-  generateYoutubeInfo: (projectId: string, script: string) => api.post("/ai/youtube-info", { project_id: projectId, script })
+  script: (projectId: string, duration: number, language: string = "English") => 
+    api.post("/ai/script", { project_id: projectId, duration_seconds: duration, language }),
+  generateYoutubeInfo: (projectId: string, script: string, language: string = "English") => 
+    api.post("/ai/youtube-info", { project_id: projectId, script, language })
+};
+
+export const script = {
+  generate: (projectId: string, prompt: string, duration: number, language: string = "English", numSegments: number = 0) =>
+    api.post("/script/generate", { project_id: projectId, prompt, duration_seconds: duration, language, num_segments: numSegments })
+};
+
+export const media = {
+  upload: (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("file", file);
+    return api.post("/media/upload", formData, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+  generateImage: (projectId: string, prompt: string, segmentIndex: number = 0, model: string = "gemini-2.5-flash") =>
+    api.post("/media/generate-image", { project_id: projectId, prompt, segment_index: segmentIndex, model }),
+  suggestPrompt: (projectId: string, segments: any[], script: string) =>
+    api.post("/media/suggest-prompt", { project_id: projectId, segments, script }),
+  generatePrompts: (projectId: string, segments: any[], count: number) =>
+    api.post("/media/generate-prompts", { project_id: projectId, segments, count }),
+  generateBatch: (projectId: string, segments: any[], model: string = "gemini-2.5-flash", count: number = 0) =>
+    api.post("/media/generate-batch", { project_id: projectId, segments, model, count }),
+  imageToVideo: (projectId: string, mediaId: string, duration: number = 5, effect: string = "zoom_in") =>
+    api.post("/media/image-to-video", { project_id: projectId, media_id: mediaId, duration, effect }),
+  list: (projectId: string) => api.get(`/media/${projectId}`),
+  getUrl: (mediaId: string) => `${api.defaults.baseURL}/media/file/${mediaId}`,
+  delete: (mediaId: string) => api.delete(`/media/${mediaId}`)
 };
 
 export const clips = {
@@ -25,8 +62,8 @@ export const clips = {
 };
 
 export const voice = {
-  generateSegment: (projectId: string, segmentIndex: number, text: string, voiceId: string, speed: number = 1.0, stability: number = 0.5) =>
-    api.post("/voice/generate-segment", { project_id: projectId, segment_index: segmentIndex, text, voice: voiceId, speed, stability }),
+  generateSegment: (projectId: string, segmentIndex: number, text: string, voiceId: string, speed: number = 1.0, stability: number = 0.5, model: string = "v2") =>
+    api.post("/voice/generate-segment", { project_id: projectId, segment_index: segmentIndex, text, voice: voiceId, speed, stability, model }),
   
   mergeSegments: (projectId: string, segmentCount: number) =>
     api.post("/voice/merge-segments", { project_id: projectId, segment_count: segmentCount }),
@@ -35,7 +72,8 @@ export const voice = {
   
   preview: (projectId: string, t?: number) => `${api.defaults.baseURL}/voice/preview/${projectId}?t=${t || Date.now()}`,
   previewSegment: (projectId: string, index: number, t?: number) => `${api.defaults.baseURL}/voice/preview-segment/${projectId}/${index}?t=${t || Date.now()}`,
-  listVoices: () => api.get("/voice/voices")
+  getVoices: () => api.get("/voice/voices"),
+  demoUrl: (voiceId: string) => `${api.defaults.baseURL}/voice/voice-demo/${voiceId}`
 };
 
 export const video = {
@@ -43,20 +81,42 @@ export const video = {
   extractClip: (projectId: string, index: number, start: number, end: number) =>
     api.post("/video/extract-clip", { project_id: projectId, index, start, end }),
   previewClip: (projectId: string, index: number, t?: number) => `${api.defaults.baseURL}/video/preview-clip/${projectId}/${index}?t=${t || Date.now()}`,
-  mergeWithOptions: (projectId: string, segments: any[], options: { subtitles: boolean; resize: string; bgMusic: string; bgMusicVolume: number }) =>
-    api.post("/video/merge", { project_id: projectId, segments, subtitles: options.subtitles, resize: options.resize, bg_music: options.bgMusic, bg_music_volume: options.bgMusicVolume }),
-  generateThumbnail: (projectId: string, script: string) => api.post("/video/thumbnail", { project_id: projectId, script }),
+  mergeWithOptions: (projectId: string, segments: any[], options: { subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; resize: string; bgMusic: string; bgMusicVolume: number }) =>
+    api.post("/video/merge", { project_id: projectId, segments, subtitles: options.subtitles, animated_subtitles: options.animatedSubtitles, subtitle_style: options.subtitleStyle, resize: options.resize, bg_music: options.bgMusic, bg_music_volume: options.bgMusicVolume }),
+  generateThumbnailPrompt: (projectId: string, script: string, language: string = "English") => 
+    api.post("/video/thumbnail-prompt", { project_id: projectId, script, language }),
+  generateThumbnailFromPrompt: (projectId: string, prompt: string, model: string = "gemini-3-pro") => 
+    api.post("/video/thumbnail-from-prompt", { project_id: projectId, prompt, model }),
   getThumbnail: (projectId: string, t?: number) => `${api.defaults.baseURL}/video/thumbnail/${projectId}?t=${t || Date.now()}`,
   downloadFinal: (projectId: string) => `${api.defaults.baseURL}/video/download/${projectId}`,
+  previewFinal: (projectId: string, t?: number) => `${api.defaults.baseURL}/video/preview/${projectId}?t=${t || Date.now()}`,
   getMusicLibrary: () => api.get("/video/music-library"),
   generateMusic: (projectId: string, presetId: string) => api.post("/video/generate-music", { project_id: projectId, preset_id: presetId }),
-  musicPreview: (presetId: string) => `${api.defaults.baseURL}/video/music-preview/${presetId}`
+  musicPreview: (presetId: string) => `${api.defaults.baseURL}/video/music-preview/${presetId}`,
+  createFromMedia: (projectId: string, mediaTimeline: any[], options: { subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; subtitleSize: number; dialogueMode?: boolean; speaker1Position?: string; speaker2Position?: string; dialogueBgStyle?: string; resize: string }) =>
+    api.post("/video/create-with-bubbles", { 
+      project_id: projectId, 
+      bubble_positions: [], 
+      media_timeline: mediaTimeline, 
+      resize: options.resize,
+      subtitles: options.subtitles,
+      animated_subtitles: options.animatedSubtitles,
+      subtitle_style: options.subtitleStyle,
+      subtitle_size: options.subtitleSize,
+      dialogue_mode: options.dialogueMode || false,
+      speaker1_position: options.speaker1Position || "top-left",
+      speaker2_position: options.speaker2Position || "top-right",
+      dialogue_bg_style: options.dialogueBgStyle || "transparent"
+    })
 };
 
 export const projects = {
   list: () => api.get("/projects"),
   get: (id: string) => api.get(`/projects/${id}`),
-  delete: (id: string) => api.delete(`/projects/${id}`)
+  delete: (id: string) => api.delete(`/projects/${id}`),
+  saveSegments: (id: string, segments: any[]) => api.post(`/projects/${id}/segments`, { segments }),
+  createCustom: (title: string, prompt: string = "", duration: number = 60) =>
+    api.post("/projects/custom", { title, prompt, duration })
 };
 
 export default api;

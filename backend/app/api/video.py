@@ -23,20 +23,57 @@ class DownloadRequest(BaseModel):
 class MergeRequest(BaseModel):
     project_id: str
     segments: List[SegmentData]
-    subtitles: bool = False  # Default OFF
+    subtitles: bool = False
+    animated_subtitles: bool = True
+    subtitle_style: str = "karaoke"  # karaoke, neon, fire, minimal, bold, typewriter, glitch, bounce, wave, shadow, gradient, retro
     resize: str = "16:9"
-    bg_music: str = ""  # Music preset ID (generated separately)
+    bg_music: str = ""
     bg_music_volume: float = 0.3
 
 class ThumbnailRequest(BaseModel):
     project_id: str
     script: str = ""
+    language: str = "English"
+    model: str = "gemini-3-pro"  # gemini-3-pro, gemini-2.5-flash, dall-e-3
 
 class ExtractClipRequest(BaseModel):
     project_id: str
     index: int
     start: int
     end: int
+
+class BubblePosition(BaseModel):
+    id: str
+    segmentIndex: int
+    mediaId: str = ""
+    x: float
+    y: float
+    width: float
+    tailDirection: str = "bottom"
+    animation: str = "pop"
+    colorIndex: int = 0
+    shape: str = "rounded"
+    transparent: bool = False
+
+class MediaTimelineItem(BaseModel):
+    id: str
+    startTime: float = 0
+    endTime: float = 5
+    assignedSegments: List[int] = []
+
+class CreateBubbleVideoRequest(BaseModel):
+    project_id: str
+    bubble_positions: List[BubblePosition] = []
+    media_timeline: List[MediaTimelineItem] = []
+    resize: str = "16:9"
+    subtitles: bool = False
+    animated_subtitles: bool = True
+    subtitle_style: str = "karaoke"
+    subtitle_size: int = 72
+    dialogue_mode: bool = False
+    speaker1_position: str = "top-left"
+    speaker2_position: str = "top-right"
+    dialogue_bg_style: str = "transparent"
 
 @router.post("/download-source")
 async def download_source(request: DownloadRequest, db: AsyncSession = Depends(get_db)):
@@ -101,7 +138,7 @@ async def merge_video(request: MergeRequest, db: AsyncSession = Depends(get_db))
     
     output_path = video_service.merge_clips_final(
         project.id, clip_paths, audio_path, subtitle_path, request.resize,
-        bg_music_path, request.bg_music_volume
+        bg_music_path, request.bg_music_volume, request.animated_subtitles, request.subtitle_style
     )
     
     project.status = "completed"
@@ -120,8 +157,8 @@ async def generate_thumbnail(request: ThumbnailRequest, db: AsyncSession = Depen
     
     script_text = request.script or project.script or project.title
     
-    # Step 1: Generate title and image prompt
-    prompt_data = await ai_service.generate_thumbnail_prompt(script_text, project.title)
+    # Step 1: Generate title and image prompt in specified language
+    prompt_data = await ai_service.generate_thumbnail_prompt(script_text, project.title, request.language)
     title_text = prompt_data.get("title", "WATCH NOW")
     image_prompt = prompt_data.get("image", f"dramatic scene about {project.title}")
     
@@ -131,10 +168,10 @@ async def generate_thumbnail(request: ThumbnailRequest, db: AsyncSession = Depen
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(f"Title: {title_text}\nImage: {image_prompt}")
     
-    # Step 2: Generate thumbnail with DALL-E including text
+    # Step 2: Generate thumbnail with selected model
     thumbnail_path = f"./storage/{project.id}/thumbnail.png"
     try:
-        await ai_service.generate_thumbnail_image(title_text, image_prompt, thumbnail_path)
+        await ai_service.generate_thumbnail_image(title_text, image_prompt, thumbnail_path, request.model)
         return {
             "thumbnail_prompt": f"{title_text} - {image_prompt}",
             "thumbnail_title": title_text,
@@ -148,6 +185,51 @@ async def generate_thumbnail(request: ThumbnailRequest, db: AsyncSession = Depen
             "error": str(e),
             "generated": False
         }
+
+class ThumbnailPromptRequest(BaseModel):
+    project_id: str
+    script: str = ""
+    language: str = "English"
+
+@router.post("/thumbnail-prompt")
+async def generate_thumbnail_prompt(request: ThumbnailPromptRequest, db: AsyncSession = Depends(get_db)):
+    """Generate just the thumbnail prompt without creating the image"""
+    project = await db.get(Project, request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    from app.services.gemini import GeminiService
+    ai_service = GeminiService()
+    
+    script_text = request.script or project.script or project.title
+    prompt_data = await ai_service.generate_thumbnail_prompt(script_text, project.title, request.language)
+    image_prompt = prompt_data.get("image", f"dramatic scene about {project.title}")
+    
+    return {"prompt": image_prompt}
+
+class ThumbnailFromPromptRequest(BaseModel):
+    project_id: str
+    prompt: str
+    model: str = "gemini-3-pro"
+
+@router.post("/thumbnail-from-prompt")
+async def generate_thumbnail_from_prompt(request: ThumbnailFromPromptRequest, db: AsyncSession = Depends(get_db)):
+    """Generate thumbnail image from a custom prompt"""
+    project = await db.get(Project, request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    from app.services.gemini import GeminiService
+    ai_service = GeminiService()
+    
+    thumbnail_path = f"./storage/{project.id}/thumbnail.png"
+    os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
+    
+    try:
+        await ai_service.generate_thumbnail_image("", request.prompt, thumbnail_path, request.model)
+        return {"generated": True, "path": thumbnail_path}
+    except Exception as e:
+        return {"generated": False, "error": str(e)}
 
 @router.get("/preview-clip/{project_id}/{index}")
 async def preview_clip(project_id: str, index: int):
@@ -168,6 +250,13 @@ async def get_thumbnail(project_id: str):
         return FileResponse(jpg_path, media_type="image/jpeg")
     else:
         raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+@router.get("/preview/{project_id}")
+async def preview_video(project_id: str):
+    output_path = f"./storage/{project_id}/final.mp4"
+    if not os.path.exists(output_path):
+        raise HTTPException(status_code=404, detail="Video not found")
+    return FileResponse(output_path, media_type="video/mp4")
 
 @router.get("/download/{project_id}")
 async def download_video(project_id: str, db: AsyncSession = Depends(get_db)):
@@ -191,6 +280,18 @@ ELEVENLABS_SOUND_PRESETS = [
     {"id": "inspiring", "name": "✨ Inspiring", "prompt": "inspiring motivational background music, uplifting and hopeful"},
     {"id": "documentary", "name": "📺 Documentary", "prompt": "documentary style background music, informative and engaging"},
     {"id": "lofi", "name": "🎧 Lo-Fi Chill", "prompt": "lo-fi chill hop background music, relaxed beats for studying"},
+    {"id": "corporate", "name": "💼 Corporate", "prompt": "professional corporate background music, clean and business-like"},
+    {"id": "acoustic", "name": "🎸 Acoustic", "prompt": "acoustic guitar background music, warm and organic folk melody"},
+    {"id": "synthwave", "name": "🌆 Synthwave", "prompt": "synthwave retro 80s background music, neon electronic vibes"},
+    {"id": "jazz", "name": "🎷 Jazz Smooth", "prompt": "smooth jazz background music, sophisticated and classy"},
+    {"id": "suspense", "name": "🔍 Suspense", "prompt": "suspenseful mysterious background music, tension and intrigue"},
+    {"id": "happy", "name": "😊 Happy", "prompt": "happy cheerful background music, bright and joyful melody"},
+    {"id": "dark", "name": "🌑 Dark Intense", "prompt": "dark intense background music, powerful and dramatic"},
+    {"id": "nature", "name": "🌿 Nature", "prompt": "nature organic background music, birds and forest ambience"},
+    {"id": "gaming", "name": "🎮 Gaming", "prompt": "gaming action background music, intense and exciting"},
+    {"id": "meditation", "name": "🧘 Meditation", "prompt": "meditation zen background music, peaceful tibetan bowls"},
+    {"id": "news", "name": "📰 News", "prompt": "news broadcast background music, urgent and informative"},
+    {"id": "comedy", "name": "😄 Comedy", "prompt": "funny comedy background music, playful and quirky"},
 ]
 
 class GenerateMusicRequest(BaseModel):
@@ -274,3 +375,87 @@ async def generate_background_music(request: GenerateMusicRequest, db: AsyncSess
             return {"path": output_path, "generated": True}
         else:
             raise HTTPException(status_code=response.status_code, detail=f"ElevenLabs error: {response.text}")
+
+
+@router.post("/create-with-bubbles")
+async def create_video_from_media(request: CreateBubbleVideoRequest, db: AsyncSession = Depends(get_db)):
+    """Create video from media assets assigned per segment"""
+    from app.models.project import MediaAsset
+    from sqlalchemy import select
+    
+    project = await db.get(Project, request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    project_dir = f"./storage/{request.project_id}"
+    audio_path = f"{project_dir}/voice.mp3"
+    
+    if not os.path.exists(audio_path):
+        raise HTTPException(status_code=400, detail="Audio not generated yet")
+    
+    # Get media assets from DB
+    result = await db.execute(
+        select(MediaAsset).where(MediaAsset.project_id == request.project_id).order_by(MediaAsset.order)
+    )
+    assets = result.scalars().all()
+    
+    media_assets = [{"id": a.id, "path": a.file_path, "type": a.media_type} for a in assets]
+    
+    if not media_assets:
+        raise HTTPException(status_code=400, detail="No media assets found")
+    
+    segments = project.segments_data or []
+    if not segments:
+        raise HTTPException(status_code=400, detail="No segments found")
+    
+    # Use existing SRT if available (has correct timing from audio merge)
+    # Otherwise generate from segments
+    subtitle_path = None
+    if request.subtitles:
+        existing_srt = f"{project_dir}/subtitles.srt"
+        if os.path.exists(existing_srt):
+            subtitle_path = existing_srt
+        else:
+            subtitle_path = f"{project_dir}/subtitles.srt"
+            _generate_srt_from_segments(segments, subtitle_path)
+    
+    service = VideoService()
+    try:
+        output = service.create_video_from_segments(
+            request.project_id,
+            segments,
+            media_assets,
+            audio_path,
+            request.resize,
+            subtitle_path,
+            request.animated_subtitles,
+            request.subtitle_style,
+            request.subtitle_size,
+            request.dialogue_mode,
+            request.speaker1_position,
+            request.speaker2_position,
+            request.dialogue_bg_style
+        )
+        
+        project.status = "completed"
+        await db.commit()
+        
+        return {"status": "completed", "path": output}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _generate_srt_from_segments(segments: list, output_path: str):
+    """Generate SRT subtitle file from segments"""
+    def fmt_time(s: float) -> str:
+        h, m = int(s // 3600), int((s % 3600) // 60)
+        sec, ms = int(s % 60), int((s % 1) * 1000)
+        return f"{h:02d}:{m:02d}:{sec:02d},{ms:03d}"
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        for i, seg in enumerate(segments, 1):
+            start = seg.get("start", 0)
+            end = seg.get("end", start + 5)
+            text = seg.get("text", "")
+            if text:
+                f.write(f"{i}\n{fmt_time(start)} --> {fmt_time(end)}\n{text}\n\n")

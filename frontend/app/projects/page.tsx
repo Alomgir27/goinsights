@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Trash2, ArrowRight, Folder, Plus, Clock } from "lucide-react";
+import { Trash2, ArrowRight, Folder, Plus, Clock, Youtube, Sparkles } from "lucide-react";
 import { projects } from "@/lib/api";
 
 interface ProjectItem {
@@ -11,6 +11,7 @@ interface ProjectItem {
   title: string;
   thumbnail: string;
   status: string;
+  project_type?: string;
   created_at: string;
 }
 
@@ -49,7 +50,7 @@ export default function ProjectsPage(): React.ReactElement {
             <h1 className="text-2xl font-bold text-[#1a1a1a]">Projects</h1>
             <p className="text-sm text-[#666] mt-1">Manage your video projects</p>
           </div>
-          <Link href="/" className="btn-primary">
+          <Link href="/projects/new" className="btn-primary">
             <Plus className="w-4 h-4" /> New Project
           </Link>
         </div>
@@ -64,7 +65,7 @@ export default function ProjectsPage(): React.ReactElement {
             </div>
             <h2 className="text-lg font-semibold text-[#1a1a1a] mb-2">No projects yet</h2>
             <p className="text-sm text-[#666] mb-6">Create your first AI-powered video project</p>
-            <Link href="/" className="btn-primary inline-flex">
+            <Link href="/projects/new" className="btn-primary inline-flex">
               Get Started <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -94,9 +95,10 @@ export default function ProjectsPage(): React.ReactElement {
                   <h3 className="font-semibold text-[#1a1a1a] truncate mb-2">{p.title || "Untitled"}</h3>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium px-2 py-1 rounded ${
+                      <span className={`text-xs font-medium px-2 py-1 rounded flex items-center gap-1 ${
                         p.status === "completed" ? "bg-green-50 text-green-600" : "bg-[#f5f5f5] text-[#666]"
                       }`}>
+                        {p.project_type === "custom" ? <Sparkles className="w-3 h-3" /> : <Youtube className="w-3 h-3" />}
                         {p.status}
                       </span>
                       <span className="text-xs text-[#999] flex items-center gap-1">

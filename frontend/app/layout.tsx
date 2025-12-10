@@ -1,12 +1,17 @@
 import React from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { ToastContainer } from "@/components/Toast";
 
 export const metadata: Metadata = {
   title: "GoInsights - AI YouTube Video Analysis",
-  description: "Transform YouTube videos into engaging content with AI"
+  description: "Transform YouTube videos into engaging content with AI",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.ReactElement {
@@ -17,10 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
         {children}
         <ToastContainer />
         
-        {/* Footer - Mobbin style */}
+        {/* Footer */}
         <footer className="border-t border-[#e5e5e5] py-8 px-6 bg-white">
           <div className="container flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <Image src="/favicon.svg" alt="GoInsights" width={24} height={24} />
               <span className="text-sm font-semibold text-[#1a1a1a]">GoInsights</span>
               <span className="text-sm text-[#999]">© 2024</span>
             </div>

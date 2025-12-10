@@ -2,7 +2,9 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { Youtube } from "lucide-react";
 
 export default function Navbar(): React.ReactElement {
   const pathname = usePathname();
@@ -10,25 +12,25 @@ export default function Navbar(): React.ReactElement {
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#e5e5e5]">
       <div className="container h-16 flex items-center justify-between">
-        {/* Logo */}
         <div className="flex items-center gap-8">
-          <Link href="/" className="text-xl font-bold text-[#1a1a1a]">
-            GoInsights
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.svg" alt="GoInsights" width={32} height={32} />
+            <span className="text-xl font-bold text-[#1a1a1a]">GoInsights</span>
           </Link>
           
-          {/* Nav Links */}
           <div className="hidden md:flex items-center gap-6">
             <NavLink href="/" label="Home" active={pathname === "/"} />
-            <NavLink href="/projects" label="Projects" active={pathname === "/projects"} />
+            <NavLink href="/projects" label="Projects" active={pathname?.startsWith("/projects") || pathname?.startsWith("/workspace")} />
+            <NavLink href="/connect" label="Connect" active={pathname === "/connect"} />
           </div>
         </div>
 
-        {/* Right side */}
         <div className="flex items-center gap-4">
-          <Link href="/projects" className="text-sm text-[#666] hover:text-[#1a1a1a] transition-colors">
-            My Projects
+          <Link href="/connect" className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700 transition-colors font-medium">
+            <Youtube className="w-4 h-4" />
+            <span className="hidden sm:inline">Connect YouTube</span>
           </Link>
-          <Link href="/" className="btn-primary text-sm py-2.5 px-5">
+          <Link href="/projects/new" className="btn-primary text-sm py-2.5 px-5">
             New Project
           </Link>
         </div>

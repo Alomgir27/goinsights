@@ -66,21 +66,21 @@ body {
 /* Cards */
 .card {
   background: #ffffff;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #f0f0f0;
   border-radius: 12px;
   padding: 24px;
   transition: all 0.2s;
 }
 .card:hover {
-  border-color: #d4d4d4;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: #e5e5e5;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
 /* Input */
 .input {
   width: 100%;
   padding: 14px 16px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #f0f0f0;
   border-radius: 8px;
   font-size: 15px;
   transition: all 0.2s;
@@ -88,11 +88,11 @@ body {
 }
 .input:focus {
   outline: none;
-  border-color: #1a1a1a;
+  border-color: #ddd;
   background: #ffffff;
 }
 .input::placeholder {
-  color: #999;
+  color: #aaa;
 }
 
 /* Badge */
@@ -140,4 +140,57 @@ body {
 }
 .animate-slide-up {
   animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Marquee Text Animations */
+.marquee-row {
+  display: flex;
+  width: 100%;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+}
+
+.marquee-text {
+  font-size: clamp(48px, 8vw, 96px);
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.marquee-text-outline {
+  font-size: clamp(48px, 8vw, 96px);
+  font-weight: 900;
+  text-transform: uppercase;
+  color: transparent;
+  -webkit-text-stroke: 2px #1a1a1a;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.marquee-dot {
+  font-size: 24px;
+  color: #e5e5e5;
+}
+
+@keyframes marquee-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-marquee-left {
+  animation: marquee-left 25s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marquee-right 25s linear infinite;
 }
