@@ -1,28 +1,8 @@
 "use client";
 
 import React from "react";
-import { Merge, Music, X, Video, Download, Image, Sparkles, Copy, Check, Youtube, Upload, Loader2, ExternalLink, Globe, Lock, EyeOff } from "lucide-react";
-
-interface MergeOptions {
-  subtitles: boolean;
-  animatedSubtitles: boolean;
-  subtitleStyle: string;
-  subtitleSize: number;
-  dialogueMode: boolean;
-  speaker1Position: string;
-  speaker2Position: string;
-  dialogueBgStyle: string;
-  resize: string;
-  bgMusic: string;
-  bgMusicVolume: number;
-}
-
-interface MusicPreset {
-  id: string;
-  name: string;
-  desc: string;
-  cached: boolean;
-}
+import { Merge, Music, X } from "lucide-react";
+import type { MergeOptions, MusicPreset } from "@/lib/types";
 
 interface MergeOptionsStepProps {
   mergeOptions: MergeOptions;
@@ -33,7 +13,7 @@ interface MergeOptionsStepProps {
   onMergeAll: () => void;
   processing: string;
   videoDownloaded: boolean;
-  projectType: "youtube" | "custom";
+  projectType: "youtube" | "custom" | "ads";
 }
 
 const SUBTITLE_STYLES = [
@@ -122,7 +102,31 @@ export default function MergeOptionsStep({
                   </div>
                 </div>
 
-                {projectType === "custom" && (
+                <div>
+                  <label className="text-xs text-[#666] block mb-2">Position</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "top", icon: "⬆️", label: "Top" },
+                      { id: "middle", icon: "⏺️", label: "Middle" },
+                      { id: "bottom", icon: "⬇️", label: "Bottom" }
+                    ].map(pos => (
+                      <button
+                        key={pos.id}
+                        onClick={() => setMergeOptions(p => ({ ...p, subtitlePosition: pos.id }))}
+                        className={`p-2 rounded-lg text-center transition-all ${
+                          mergeOptions.subtitlePosition === pos.id
+                            ? "bg-purple-100 border-2 border-purple-500"
+                            : "bg-[#f5f5f5] border-2 border-transparent hover:border-purple-200"
+                        }`}
+                      >
+                        <span className="text-lg block">{pos.icon}</span>
+                        <span className="text-xs">{pos.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(projectType === "custom" || projectType === "ads") && (
                   <div className="border-t border-slate-700 pt-3 mt-3">
                     <label className="flex items-center gap-2 cursor-pointer mb-2">
                       <input

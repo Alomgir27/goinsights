@@ -2,11 +2,10 @@ import React from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
 import { ToastContainer } from "@/components/Toast";
 
 export const metadata: Metadata = {
-  title: "GoInsights - AI YouTube Video Analysis",
+  title: "ZapClip - AI Video Creator",
   description: "Transform YouTube videos into engaging content with AI",
   icons: {
     icon: "/favicon.svg",
@@ -18,7 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html lang="en">
       <body className="min-h-screen bg-white">
-        <Navbar />
         {children}
         <ToastContainer />
         
@@ -26,8 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
         <footer className="border-t border-[#e5e5e5] py-8 px-6 bg-white">
           <div className="container flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Image src="/favicon.svg" alt="GoInsights" width={24} height={24} />
-              <span className="text-sm font-semibold text-[#1a1a1a]">GoInsights</span>
+              <Image src="/favicon.svg" alt="ZapClip" width={24} height={24} />
+              <span className="text-sm font-semibold text-[#1a1a1a]">ZapClip</span>
               <span className="text-sm text-[#999]">© 2024</span>
             </div>
             <div className="flex items-center gap-6">

@@ -525,6 +525,25 @@ class PublishRequest(BaseModel):
     privacy: str = "private"
     playlist_id: Optional[str] = None
     access_token: str
+    schedule_time: Optional[str] = None  # "morning" or "evening"
+    made_for_kids: bool = False
+    category_id: str = "22"  # Default: People & Blogs
+
+
+def calculate_schedule_time(time_preference: str) -> str:
+    """Calculate scheduled publish time (at least 24h later, morning 9AM or evening 7PM UTC)"""
+    from datetime import datetime, timedelta
+    
+    now = datetime.utcnow()
+    tomorrow = now + timedelta(hours=26)  # 26h to ensure at least 24h buffer
+    
+    target_hour = 9 if time_preference == "morning" else 19
+    scheduled = tomorrow.replace(hour=target_hour, minute=0, second=0, microsecond=0)
+    
+    if scheduled <= now + timedelta(hours=24):
+        scheduled += timedelta(days=1)
+    
+    return scheduled.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
 @router.post("/publish")
@@ -555,18 +574,26 @@ async def publish_to_youtube(request: PublishRequest, db: AsyncSession = Depends
     # Parse tags
     tags_list = [t.strip() for t in request.tags.split(",") if t.strip()][:500]
     
+    # Build status with optional scheduling
+    status_data = {"privacyStatus": "private", "selfDeclaredMadeForKids": request.made_for_kids}
+    scheduled_time = None
+    
+    if request.schedule_time in ("morning", "evening"):
+        scheduled_time = calculate_schedule_time(request.schedule_time)
+        status_data["publishAt"] = scheduled_time
+        print(f"Scheduled for: {scheduled_time}")
+    elif request.privacy != "private":
+        status_data["privacyStatus"] = request.privacy
+    
     # Video metadata
     metadata = {
         "snippet": {
             "title": request.title[:100],
             "description": request.description[:5000],
             "tags": tags_list,
-            "categoryId": "22"  # People & Blogs
+            "categoryId": request.category_id
         },
-        "status": {
-            "privacyStatus": request.privacy,
-            "selfDeclaredMadeForKids": False
-        }
+        "status": status_data
     }
     
     try:
@@ -676,7 +703,8 @@ async def publish_to_youtube(request: PublishRequest, db: AsyncSession = Depends
                 "video_url": f"https://www.youtube.com/watch?v={video_id}",
                 "thumbnail_uploaded": thumbnail_uploaded,
                 "playlist_added": playlist_added,
-                "privacy": request.privacy
+                "privacy": request.privacy,
+                "scheduled_at": scheduled_time
             }
             
     except httpx.TimeoutException:

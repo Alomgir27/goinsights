@@ -13,6 +13,7 @@ class GenerateScriptRequest(BaseModel):
     duration_seconds: int = 60
     language: str = "English"
     num_segments: int = 0
+    video_style: str = "dialogue"
 
 @router.post("/generate")
 async def generate_script_from_prompt(request: GenerateScriptRequest, db: AsyncSession = Depends(get_db)):
@@ -20,7 +21,7 @@ async def generate_script_from_prompt(request: GenerateScriptRequest, db: AsyncS
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    from app.services.gemini import GeminiService
+    from app.services.ai import GeminiService
     service = GeminiService()
     
     num_segments = request.num_segments or max(3, request.duration_seconds // 10)
@@ -29,7 +30,8 @@ async def generate_script_from_prompt(request: GenerateScriptRequest, db: AsyncS
         request.prompt, 
         request.duration_seconds, 
         request.language,
-        num_segments
+        num_segments,
+        request.video_style
     )
     
     project.script = result["script"]

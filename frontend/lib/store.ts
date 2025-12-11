@@ -23,6 +23,8 @@ interface SegmentData {
 interface Project {
   id: string;
   project_type?: "youtube" | "custom";
+  video_style?: string;
+  language?: string;
   videoId?: string;
   title: string;
   thumbnail?: string;

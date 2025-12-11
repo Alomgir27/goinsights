@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Loader2, Play, FileText, Sparkles, Mic, Scissors, Zap, Youtube } from "lucide-react";
+import { ArrowRight, Loader2, Play, FileText, Mic, Scissors, Zap, Youtube, Image, Music, Wand2, MessageSquare, Type } from "lucide-react";
 import { youtube } from "@/lib/api";
 import { useStore } from "@/lib/store";
+import Navbar from "@/components/Navbar";
 
 export default function Home(): React.ReactElement {
   const [url, setUrl] = useState("");
@@ -73,9 +74,11 @@ export default function Home(): React.ReactElement {
   };
 
   return (
-    <main className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="pt-16 pb-20 px-6">
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-white">
+        {/* Hero Section */}
+      <section className="pt-24 pb-20 px-6">
         <div className="container text-center">
           {/* Badge */}
           <div className="badge mb-8 animate-fade-in">
@@ -85,13 +88,12 @@ export default function Home(): React.ReactElement {
 
           {/* Main Heading - Mobbin style */}
           <h1 className="text-[52px] md:text-[64px] lg:text-[72px] font-extrabold leading-[1.05] tracking-[-0.02em] text-[#1a1a1a] mb-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-            Transform YouTube videos<br />
-            into engaging content.
+            AI-powered video <br /> creation studio.
           </h1>
 
           {/* Subtitle */}
           <p className="text-lg text-[#666] max-w-xl mx-auto mb-10 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            Extract transcripts, generate AI scripts, create clips, and add voiceovers — all in one place.
+            Generate scripts, voiceovers, thumbnails, and full videos — from YouTube or your own ideas.
           </p>
 
           {/* Video Preview */}
@@ -167,13 +169,13 @@ export default function Home(): React.ReactElement {
           <div className="marquee-track animate-marquee-left">
             {[...Array(2)].map((_, i) => (
               <div key={i} className="flex items-center gap-8 mr-8">
-                <span className="marquee-text">CREATE</span>
+                <span className="marquee-text">SCRIPTS</span>
                 <span className="marquee-dot">●</span>
-                <span className="marquee-text">TRANSFORM</span>
+                <span className="marquee-text">VOICEOVER</span>
                 <span className="marquee-dot">●</span>
-                <span className="marquee-text">VIRAL</span>
+                <span className="marquee-text">THUMBNAILS</span>
                 <span className="marquee-dot">●</span>
-                <span className="marquee-text">SHORTS</span>
+                <span className="marquee-text">SUBTITLES</span>
                 <span className="marquee-dot">●</span>
                 <span className="marquee-text">AI POWERED</span>
                 <span className="marquee-dot">●</span>
@@ -185,15 +187,15 @@ export default function Home(): React.ReactElement {
           <div className="marquee-track animate-marquee-right">
             {[...Array(2)].map((_, i) => (
               <div key={i} className="flex items-center gap-8 mr-8">
-                <span className="marquee-text-outline">REPURPOSE</span>
+                <span className="marquee-text-outline">YOUTUBE</span>
                 <span className="marquee-dot text-red-500">●</span>
-                <span className="marquee-text-outline">ENGAGE</span>
+                <span className="marquee-text-outline">SHORTS</span>
                 <span className="marquee-dot text-red-500">●</span>
-                <span className="marquee-text-outline">GROW</span>
+                <span className="marquee-text-outline">MUSIC</span>
                 <span className="marquee-dot text-red-500">●</span>
-                <span className="marquee-text-outline">AUTOMATE</span>
+                <span className="marquee-text-outline">DIALOGUE</span>
                 <span className="marquee-dot text-red-500">●</span>
-                <span className="marquee-text-outline">SCALE</span>
+                <span className="marquee-text-outline">EXPORT</span>
                 <span className="marquee-dot text-red-500">●</span>
               </div>
             ))}
@@ -201,92 +203,156 @@ export default function Home(): React.ReactElement {
         </div>
       </section>
 
-      {/* Features Bento Grid */}
-      <section className="py-20 px-6 bg-white">
+      {/* Features Section */}
+      <section className="py-20 px-6">
         <div className="container">
-          <div className="text-center mb-16">
-            <span className="inline-block text-xs font-bold tracking-[0.2em] text-red-500 uppercase mb-4">FEATURES</span>
-            <h2 className="text-4xl md:text-5xl font-black text-[#1a1a1a] tracking-tight">Everything you need</h2>
+          <div className="text-center mb-14">
+            <p className="text-sm text-[#888] mb-3">What you get</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a1a]">Everything you need</h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto">
-            {/* Large Card */}
-            <div className="md:col-span-2 bg-gradient-to-br from-[#1a1a1a] to-[#333] rounded-2xl p-8 text-white group hover:scale-[1.02] transition-transform">
-              <FileText className="w-10 h-10 mb-6 text-red-400" />
-              <h3 className="text-2xl font-bold mb-3">AI Transcription</h3>
-              <p className="text-gray-400 leading-relaxed">Automatic transcripts with timestamps, speaker detection, and smart segmentation for any YouTube video.</p>
-            </div>
-            
-            {/* Small Card */}
-            <div className="bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl p-8 text-white group hover:scale-[1.02] transition-transform">
-              <Sparkles className="w-10 h-10 mb-6 opacity-80" />
-              <h3 className="text-xl font-bold mb-2">Script Generator</h3>
-              <p className="text-white/80 text-sm">AI writes viral scripts from your content.</p>
-            </div>
-            
-            {/* Row 2 */}
-            <div className="bg-[#fafafa] rounded-2xl p-8 border border-[#e5e5e5] group hover:border-[#1a1a1a] hover:scale-[1.02] transition-all">
-              <Scissors className="w-10 h-10 mb-6 text-[#1a1a1a]" />
-              <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">Auto Clips</h3>
-              <p className="text-[#666] text-sm">Extract the best moments automatically.</p>
-            </div>
-            
-            <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl p-8 text-white group hover:scale-[1.02] transition-transform">
-              <Mic className="w-10 h-10 mb-6 opacity-80" />
-              <h3 className="text-xl font-bold mb-2">Voice Synthesis</h3>
-              <p className="text-white/80 text-sm">Natural AI voiceovers in multiple voices.</p>
-            </div>
-            
-            <div className="bg-[#1a1a1a] rounded-2xl p-8 text-white group hover:scale-[1.02] transition-transform">
-              <Zap className="w-10 h-10 mb-6 text-yellow-400" />
-              <h3 className="text-xl font-bold mb-2">Fast Export</h3>
-              <p className="text-gray-400 text-sm">Cloud-powered HD video rendering.</p>
-            </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <FeatureCard 
+              icon={<Wand2 className="w-5 h-5" />}
+              title="AI Script Writer"
+              desc="Generate scripts from any topic or prompt instantly."
+            />
+            <FeatureCard 
+              icon={<Mic className="w-5 h-5" />}
+              title="Voice Synthesis"
+              desc="Natural AI voices with 20+ styles and languages."
+            />
+            <FeatureCard 
+              icon={<Image className="w-5 h-5" />}
+              title="AI Thumbnails"
+              desc="Generate eye-catching thumbnails with Gemini & DALL-E."
+            />
+            <FeatureCard 
+              icon={<Type className="w-5 h-5" />}
+              title="Animated Subtitles"
+              desc="12+ subtitle styles: karaoke, neon, fire, glitch & more."
+            />
+            <FeatureCard 
+              icon={<Music className="w-5 h-5" />}
+              title="Background Music"
+              desc="AI-generated music tracks for any mood."
+            />
+            <FeatureCard 
+              icon={<MessageSquare className="w-5 h-5" />}
+              title="Dialogue Mode"
+              desc="Two-speaker videos with speech bubbles."
+            />
+            <FeatureCard 
+              icon={<Youtube className="w-5 h-5" />}
+              title="YouTube Import"
+              desc="Extract and repurpose any YouTube video."
+            />
+            <FeatureCard 
+              icon={<Scissors className="w-5 h-5" />}
+              title="Auto Clips"
+              desc="Extract the best moments automatically."
+            />
+            <FeatureCard 
+              icon={<Zap className="w-5 h-5" />}
+              title="Fast Export"
+              desc="Cloud-powered HD video rendering."
+            />
           </div>
         </div>
       </section>
 
-      {/* How it Works */}
-      <section className="py-16 px-6">
-        <div className="container">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-[#1a1a1a] mb-3">How it works</h2>
-            <p className="text-[#666]">Three simple steps to transform your content</p>
+      {/* How it Works - Visual Flow */}
+      <section className="py-20 px-6 bg-gradient-to-b from-white to-[#fafafa]">
+        <div className="container max-w-5xl">
+          <div className="text-center mb-16">
+            <p className="text-sm text-[#888] mb-3">How it works</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a1a]">Create in seconds</h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto">
-            <StepCard num="1" title="Paste URL" desc="Drop any YouTube video link" />
-            <StepCard num="2" title="AI Analyzes" desc="Get transcripts, summaries, and more" />
-            <StepCard num="3" title="Export" desc="Download clips with voiceover" />
+          {/* Single Flow */}
+          <div className="relative">
+            {/* Connection Line */}
+            <div className="hidden md:block absolute top-12 left-[10%] right-[10%] h-[2px] bg-gradient-to-r from-red-200 via-[#e5e5e5] to-purple-200" />
+            
+            <div className="grid md:grid-cols-4 gap-8 md:gap-4">
+              <FlowStep 
+                num="01"
+                icon={<Youtube className="w-5 h-5" />}
+                color="red"
+                title="Input"
+                desc="Paste YouTube URL or describe your idea"
+              />
+              <FlowStep 
+                num="02"
+                icon={<FileText className="w-5 h-5" />}
+                color="gray"
+                title="Script"
+                desc="AI extracts or generates your script"
+              />
+              <FlowStep 
+                num="03"
+                icon={<Mic className="w-5 h-5" />}
+                color="gray"
+                title="Voice & Media"
+                desc="Add voiceover, music, thumbnails"
+              />
+              <FlowStep 
+                num="04"
+                icon={<Zap className="w-5 h-5" />}
+                color="purple"
+                title="Export"
+                desc="Download HD video ready to publish"
+              />
+            </div>
           </div>
+
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6 bg-[#1a1a1a]">
+      <section className="py-16 px-6 bg-[#f5f5f5]">
         <div className="container text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to get started?</h2>
-          <p className="text-[#999] mb-8">Transform your first video in under a minute.</p>
+          <h2 className="text-2xl font-bold text-[#1a1a1a] mb-3">Ready to get started?</h2>
+          <p className="text-[#666] mb-6 text-sm">Transform your first video in under a minute.</p>
           <button 
             onClick={() => document.querySelector("input")?.focus()} 
-            className="bg-white text-[#1a1a1a] px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all inline-flex items-center gap-2"
+            className="btn-primary"
           >
             Try it free <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </section>
-    </main>
+      </main>
+    </>
   );
 }
 
-function StepCard({ num, title, desc }: { num: string; title: string; desc: string }): React.ReactElement {
+function FlowStep({ num, icon, color, title, desc }: { num: string; icon: React.ReactNode; color: string; title: string; desc: string }): React.ReactElement {
+  const colorMap: Record<string, string> = {
+    red: "bg-red-500 text-white",
+    purple: "bg-purple-600 text-white",
+    gray: "bg-white text-[#1a1a1a] border border-[#eee]"
+  };
   return (
-    <div className="text-center">
-      <div className="w-12 h-12 bg-[#1a1a1a] text-white rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-4">
-        {num}
+    <div className="relative flex flex-col items-center text-center">
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${colorMap[color]}`}>
+        {icon}
       </div>
-      <h3 className="font-semibold text-[#1a1a1a] mb-2">{title}</h3>
-      <p className="text-sm text-[#666]">{desc}</p>
+      <span className="text-[10px] font-bold text-[#ccc] tracking-wider mb-1">{num}</span>
+      <h4 className="font-semibold text-[#1a1a1a] text-sm mb-1">{title}</h4>
+      <p className="text-xs text-[#888] leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }): React.ReactElement {
+  return (
+    <div className="p-5 rounded-xl bg-[#fafafa] hover:bg-[#f5f5f5] transition-colors">
+      <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-[#1a1a1a] mb-4 border border-[#eee]">
+        {icon}
+      </div>
+      <h3 className="font-semibold text-[#1a1a1a] mb-1">{title}</h3>
+      <p className="text-sm text-[#666] leading-relaxed">{desc}</p>
     </div>
   );
 }

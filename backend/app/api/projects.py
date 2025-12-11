@@ -13,6 +13,8 @@ class CustomProjectRequest(BaseModel):
     title: str
     prompt: str = ""
     duration: int = 60
+    video_style: str = "dialogue"
+    language: str = "English"
 
 @router.get("")
 async def list_projects(db: AsyncSession = Depends(get_db)):
@@ -37,6 +39,8 @@ async def create_custom_project(request: CustomProjectRequest, db: AsyncSession 
         title=request.title,
         prompt=request.prompt,
         duration=request.duration,
+        video_style=request.video_style,
+        language=request.language,
         status="pending"
     )
     db.add(project)
@@ -45,7 +49,7 @@ async def create_custom_project(request: CustomProjectRequest, db: AsyncSession 
     
     os.makedirs(f"./storage/{project.id}", exist_ok=True)
     
-    return {"id": project.id, "title": project.title, "project_type": "custom"}
+    return {"id": project.id, "title": project.title, "project_type": "custom", "video_style": project.video_style}
 
 @router.get("/{project_id}")
 async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
@@ -74,9 +78,9 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
         except:
             pass
     
-    # Load media assets for custom projects
+    # Load media assets for custom/ads projects
     media_assets = []
-    if project.project_type == "custom":
+    if project.project_type in ("custom", "ads"):
         result = await db.execute(
             select(MediaAsset).where(MediaAsset.project_id == project_id).order_by(MediaAsset.order)
         )
@@ -90,6 +94,8 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
     return {
         "id": project.id,
         "project_type": project.project_type or "youtube",
+        "video_style": project.video_style or "dialogue",
+        "language": project.language or "English",
         "youtube_url": project.youtube_url,
         "video_id": project.video_id,
         "title": project.title,
@@ -132,6 +138,7 @@ async def save_segments(project_id: str, data: dict, db: AsyncSession = Depends(
             "trim_start": s.get("trimStart", s.get("trim_start", 0)),
             "trim_end": s.get("trimEnd", s.get("trim_end")),
             "effect": s.get("effect", "none"),
+            "audio_generated": s.get("audioGenerated", s.get("audio_generated", False)),
         }
         for s in segments
     ]
@@ -144,6 +151,24 @@ async def save_segments(project_id: str, data: dict, db: AsyncSession = Depends(
     print(f"Saved {len(segments_data)} segments for project {project_id}")
     return {"status": "saved", "count": len(segments_data)}
 
+
+class UpdateProjectRequest(BaseModel):
+    language: str = None
+    video_style: str = None
+
+@router.patch("/{project_id}")
+async def update_project(project_id: str, data: UpdateProjectRequest, db: AsyncSession = Depends(get_db)):
+    project = await db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if data.language:
+        project.language = data.language
+    if data.video_style:
+        project.video_style = data.video_style
+    
+    await db.commit()
+    return {"status": "updated", "language": project.language, "video_style": project.video_style}
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: AsyncSession = Depends(get_db)):

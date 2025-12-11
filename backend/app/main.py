@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     yield
 
-app = FastAPI(title="GoInsights - YouTube AI Shorts Generator", lifespan=lifespan)
+app = FastAPI(title="ZapClip - AI Video Creator", lifespan=lifespan)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

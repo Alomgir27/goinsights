@@ -1,40 +1,15 @@
 "use client";
 
 import React from "react";
-import { Loader2, Scissors, Play, RefreshCw, Video, Trash2, Plus, Image } from "lucide-react";
+import { Loader2, Scissors, Play, RefreshCw, Video, Trash2, Plus } from "lucide-react";
 import VoiceSelector from "./VoiceSelector";
-
-interface Segment {
-  text: string;
-  start: number;
-  end: number;
-  sourceStart: number;
-  sourceEnd: number;
-  audioGenerated: boolean;
-  clipExtracted: boolean;
-  timestamp: number;
-  voiceId?: string;
-  mediaId?: string;
-  mediaType?: string;
-  duration?: number;
-  trimStart?: number;
-  trimEnd?: number;
-}
-
-interface Voice {
-  id: string;
-  name: string;
-  gender: string;
-  style: string;
-  accent: string;
-  langs: string;
-}
+import type { Segment, Voice, MediaAsset } from "@/lib/types";
 
 interface SegmentCardProps {
   segment: Segment;
   index: number;
   voices: Voice[];
-  projectType: "youtube" | "custom";
+  projectType: "youtube" | "custom" | "ads";
   videoDownloaded: boolean;
   generatingIndex: number | null;
   extractingIndex: number | null;
@@ -53,7 +28,7 @@ interface SegmentCardProps {
   canRemove: boolean;
   previewClipUrl: string;
   previewAudioUrl: string;
-  mediaAssets?: any[];
+  mediaAssets?: MediaAsset[];
   onAssignMedia?: (mediaId: string | null) => void;
 }
 
@@ -69,7 +44,7 @@ export default function SegmentCard({
 
   return (
     <div className={`p-3 border rounded-lg relative group ${
-      segment.audioGenerated && (segment.clipExtracted || projectType === "custom")
+      segment.audioGenerated && (segment.clipExtracted || projectType === "custom" || projectType === "ads")
         ? "border-green-200 bg-green-50/50"
         : segment.audioGenerated || segment.clipExtracted
         ? "border-blue-200 bg-blue-50/50"
@@ -114,23 +89,42 @@ export default function SegmentCard({
           <div className="flex-1 flex items-center gap-2">
             <div className="flex items-center gap-1 bg-purple-50 px-2 py-1 rounded text-xs">
               <span className="text-purple-600 font-medium text-[10px]">Duration:</span>
-              <input type="number" value={segment.duration || 8} onChange={(e) => onUpdate("duration", +e.target.value)}
-                className="w-12 px-1 py-0.5 border border-slate-200 rounded text-center text-[10px]" min={3} max={60} />
-              <span className="text-slate-400 text-[10px]">s</span>
+              {segment.audioGenerated ? (
+                <span className="text-purple-700 font-semibold text-[10px]">{Math.round((segment.end - segment.start) * 10) / 10}s</span>
+              ) : (
+                <>
+                  <input type="number" value={segment.duration || 8} onChange={(e) => onUpdate("duration", +e.target.value)}
+                    className="w-12 px-1 py-0.5 border border-slate-200 rounded text-center text-[10px]" min={3} max={60} />
+                  <span className="text-slate-400 text-[10px]">s</span>
+                </>
+              )}
             </div>
             {mediaAssets && mediaAssets.length > 0 && (
-              <select
-                value={segment.mediaId || ""}
-                onChange={(e) => onAssignMedia?.(e.target.value || null)}
-                className="text-[10px] px-2 py-1 border border-slate-200 rounded bg-white"
-              >
-                <option value="">No media</option>
-                {mediaAssets.map((m: any) => (
-                  <option key={m.id} value={m.id}>
-                    {m.type === "image" ? "🖼️" : "🎬"} {m.prompt?.slice(0, 20) || `Media ${m.order + 1}`}
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={segment.mediaId || ""}
+                  onChange={(e) => onAssignMedia?.(e.target.value || null)}
+                  className="text-[10px] px-2 py-1 border border-slate-200 rounded bg-white"
+                >
+                  <option value="">No media</option>
+                  {mediaAssets.map((m, i) => (
+                    <option key={m.id} value={m.id}>
+                      {m.type === "image" ? "🖼️" : "🎬"} #{i + 1}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={segment.effect || "none"}
+                  onChange={(e) => onUpdate("effect", e.target.value)}
+                  className="text-[10px] px-2 py-1 border border-blue-200 rounded bg-blue-50"
+                >
+                  <option value="none">No Effect</option>
+                  <option value="fade">Fade</option>
+                  <option value="pop">Pop</option>
+                  <option value="slide">Slide</option>
+                  <option value="zoom">Zoom</option>
+                </select>
+              </>
             )}
           </div>
         )}
@@ -170,7 +164,7 @@ export default function SegmentCard({
         )}
         <button onClick={onGenerateAudio} disabled={isGenerating || isExtracting}
           className={`text-xs py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 font-medium transition-all ${
-            projectType === "custom" ? "col-span-2" : ""
+            (projectType === "custom" || projectType === "ads") ? "col-span-2" : ""
           } ${
             isGenerating ? "bg-blue-600 text-white" :
             segment.audioGenerated ? "bg-emerald-500 text-white" :

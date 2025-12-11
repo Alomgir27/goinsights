@@ -2,13 +2,7 @@
 
 import React from "react";
 import { Music, X, Play, Pause, Check, Loader2, Volume2 } from "lucide-react";
-
-interface MusicPreset {
-  id: string;
-  name: string;
-  desc: string;
-  cached: boolean;
-}
+import type { MusicPreset } from "@/lib/types";
 
 interface MusicSheetProps {
   isOpen: boolean;

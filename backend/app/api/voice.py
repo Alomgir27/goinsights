@@ -50,7 +50,16 @@ async def generate_segment(request: SegmentRequest, db: AsyncSession = Depends(g
         speed=request.speed, stability=request.stability, model=request.model
     )
     
-    return {"segment_index": request.segment_index, "audio_path": audio_path}
+    # Get audio duration
+    duration = 5.0
+    if os.path.exists(audio_path):
+        try:
+            audio = AudioSegment.from_mp3(audio_path)
+            duration = len(audio) / 1000.0
+        except:
+            pass
+    
+    return {"segment_index": request.segment_index, "audio_path": audio_path, "duration": duration}
 
 @router.post("/merge-segments")
 async def merge_segments(request: MergeSegmentsRequest, db: AsyncSession = Depends(get_db)):

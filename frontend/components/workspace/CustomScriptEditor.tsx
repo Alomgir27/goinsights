@@ -1,33 +1,56 @@
 "use client";
 
 import React, { useState } from "react";
-import { FileText, Sparkles, Loader2, RefreshCw, Clock } from "lucide-react";
+import { FileText, Sparkles, Loader2, RefreshCw, Clock, MessageSquare, BookOpen, GraduationCap, Film, Mic, ShoppingBag, Users, Zap, Megaphone } from "lucide-react";
 import { script as scriptApi } from "@/lib/api";
+
+const CONTENT_STYLES = [
+  { id: "dialogue", label: "Dialogue", desc: "Two speakers conversing", icon: MessageSquare },
+  { id: "storytelling", label: "Story", desc: "Narrator telling a story", icon: BookOpen },
+  { id: "tutorial", label: "Tutorial", desc: "Step-by-step guide", icon: GraduationCap },
+  { id: "documentary", label: "Documentary", desc: "Informative narration", icon: Film },
+  { id: "podcast", label: "Podcast", desc: "Casual chat", icon: Mic },
+];
+
+const ADS_STYLES = [
+  { id: "product_demo", label: "Product Demo", desc: "Showcase features", icon: ShoppingBag },
+  { id: "testimonial", label: "Testimonial", desc: "Customer review", icon: Users },
+  { id: "social_ad", label: "Social Ad", desc: "Short & punchy", icon: Zap },
+  { id: "promo", label: "Promo", desc: "Launch announcement", icon: Megaphone },
+];
+
+const ALL_STYLES = [...CONTENT_STYLES, ...ADS_STYLES];
 
 interface CustomScriptEditorProps {
   projectId: string;
   initialPrompt?: string;
   initialScript?: string;
   initialDuration?: number;
+  initialVideoStyle?: string;
+  language: string;
+  onLanguageChange: (lang: string) => void;
   onScriptGenerated: (script: string, segments: any[]) => void;
 }
 
 export default function CustomScriptEditor({
-  projectId, initialPrompt, initialScript, initialDuration, onScriptGenerated
+  projectId, initialPrompt, initialScript, initialDuration, initialVideoStyle, language, onLanguageChange, onScriptGenerated
 }: CustomScriptEditorProps) {
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [scriptText, setScriptText] = useState(initialScript || "");
   const [duration, setDuration] = useState(initialDuration || 60);
   const [customDuration, setCustomDuration] = useState(initialDuration && ![30, 60, 120, 180, 300, 600].includes(initialDuration) ? String(Math.round(initialDuration / 60)) : "");
-  const [language, setLanguage] = useState("English");
   const [numSegments, setNumSegments] = useState(0);
+  const [videoStyle, setVideoStyle] = useState(initialVideoStyle || "dialogue");
   const [generating, setGenerating] = useState(false);
+  
+  const isAdsStyle = ADS_STYLES.some(s => s.id === videoStyle);
+  const availableStyles = isAdsStyle || ADS_STYLES.some(s => s.id === initialVideoStyle) ? ADS_STYLES : CONTENT_STYLES;
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setGenerating(true);
     try {
-      const { data } = await scriptApi.generate(projectId, prompt, duration, language, numSegments);
+      const { data } = await scriptApi.generate(projectId, prompt, duration, language, numSegments, videoStyle);
       setScriptText(data.script);
       onScriptGenerated(data.script, data.segments || []);
     } catch (err) {
@@ -78,6 +101,29 @@ export default function CustomScriptEditor({
           />
         </div>
 
+        <div>
+          <label className="text-xs text-slate-600 block mb-2">Video Style</label>
+          <div className="flex flex-wrap gap-2">
+            {availableStyles.map((style) => (
+              <button
+                key={style.id}
+                onClick={() => setVideoStyle(style.id)}
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  videoStyle === style.id 
+                    ? isAdsStyle ? "bg-orange-600 text-white" : "bg-purple-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <style.icon className="w-3.5 h-3.5" />
+                {style.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1.5">
+            {ALL_STYLES.find(s => s.id === videoStyle)?.desc}
+          </p>
+        </div>
+
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="text-xs text-slate-600 block mb-1">
@@ -113,7 +159,7 @@ export default function CustomScriptEditor({
             <label className="text-xs text-slate-600 block mb-1">Language</label>
             <select
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => onLanguageChange(e.target.value)}
               className="w-full py-1.5 px-2 border border-slate-200 rounded text-xs focus:border-purple-400 focus:outline-none"
             >
               <option value="English">🇺🇸 English</option>
@@ -144,7 +190,9 @@ export default function CustomScriptEditor({
         <button
           onClick={handleGenerate}
           disabled={!prompt.trim() || generating}
-          className="w-full py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          className={`w-full py-2.5 text-white rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${
+            isAdsStyle ? "bg-orange-600 hover:bg-orange-700" : "bg-purple-600 hover:bg-purple-700"
+          }`}
         >
           {generating ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Generating Script...</>

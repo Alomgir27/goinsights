@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Youtube, Check, LogOut, Loader2, Play, RefreshCw, Search, Heart, Eye, ThumbsUp, Clock, Calendar, X, Plus, Pause } from "lucide-react";
+import { Youtube, Check, LogOut, Loader2, Play, RefreshCw, Search, Heart, Eye, ThumbsUp, Clock, Calendar, X, Plus, Pause, ArrowLeft } from "lucide-react";
 import { youtube } from "@/lib/api";
+import Link from "next/link";
 
 interface Video {
   id: string;
@@ -175,13 +176,18 @@ export default function ConnectPage(): React.ReactElement {
       <div className="bg-white border-b border-slate-100 py-5">
         <div className="max-w-[1800px] mx-auto px-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                <Youtube className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">Discover Videos</h1>
-                <p className="text-slate-400 text-xs">Find videos to transform</p>
+            <div className="flex items-center gap-4">
+              <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <ArrowLeft className="w-5 h-5 text-slate-600" />
+              </Link>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                  <Youtube className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">Discover Videos</h1>
+                  <p className="text-slate-400 text-xs">Find videos to transform</p>
+                </div>
               </div>
             </div>
             

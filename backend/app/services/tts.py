@@ -46,7 +46,7 @@ VOICES = {
     "lucas": {"id": "onwK4e9ZLuTAKqWW03F9", "name": "Lucas", "gender": "Male", "style": "Friendly, Natural", "accent": "Portuguese", "langs": "Portuguese+"},
 }
 
-DEMO_TEXT = "Welcome to GoInsights. Create stunning video content with AI-powered voice generation."
+DEMO_TEXT = "Welcome to ZapClip. Create stunning video content with AI-powered voice generation."
 
 # Available TTS models
 MODELS = {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Trash2, ArrowRight, Folder, Plus, Clock, Youtube, Sparkles } from "lucide-react";
+import { Trash2, ArrowRight, Folder, Plus, Clock, Youtube, Sparkles, ArrowLeft } from "lucide-react";
 import { projects } from "@/lib/api";
 
 interface ProjectItem {
@@ -46,9 +46,14 @@ export default function ProjectsPage(): React.ReactElement {
       <div className="container">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-[#1a1a1a]">Projects</h1>
-            <p className="text-sm text-[#666] mt-1">Manage your video projects</p>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="p-2 hover:bg-[#f5f5f5] rounded-lg transition-colors">
+              <ArrowLeft className="w-5 h-5 text-[#666]" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-[#1a1a1a]">Projects</h1>
+              <p className="text-sm text-[#666] mt-1">Manage your video projects</p>
+            </div>
           </div>
           <Link href="/projects/new" className="btn-primary">
             <Plus className="w-4 h-4" /> New Project

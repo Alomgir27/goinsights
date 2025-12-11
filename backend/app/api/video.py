@@ -70,6 +70,7 @@ class CreateBubbleVideoRequest(BaseModel):
     animated_subtitles: bool = True
     subtitle_style: str = "karaoke"
     subtitle_size: int = 72
+    subtitle_position: str = "bottom"
     dialogue_mode: bool = False
     speaker1_position: str = "top-left"
     speaker2_position: str = "top-right"
@@ -152,7 +153,7 @@ async def generate_thumbnail(request: ThumbnailRequest, db: AsyncSession = Depen
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    from app.services.gemini import GeminiService
+    from app.services.ai import GeminiService
     ai_service = GeminiService()
     
     script_text = request.script or project.script or project.title
@@ -190,6 +191,8 @@ class ThumbnailPromptRequest(BaseModel):
     project_id: str
     script: str = ""
     language: str = "English"
+    image_style: str = "cartoon"
+    video_type: str = "tutorial"
 
 @router.post("/thumbnail-prompt")
 async def generate_thumbnail_prompt(request: ThumbnailPromptRequest, db: AsyncSession = Depends(get_db)):
@@ -198,19 +201,25 @@ async def generate_thumbnail_prompt(request: ThumbnailPromptRequest, db: AsyncSe
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    from app.services.gemini import GeminiService
+    from app.services.ai import GeminiService
     ai_service = GeminiService()
     
     script_text = request.script or project.script or project.title
-    prompt_data = await ai_service.generate_thumbnail_prompt(script_text, project.title, request.language)
+    prompt_data = await ai_service.generate_thumbnail_prompt(
+        script_text, project.title, request.language, request.image_style, request.video_type
+    )
     image_prompt = prompt_data.get("image", f"dramatic scene about {project.title}")
+    title_text = prompt_data.get("title", "")
     
-    return {"prompt": image_prompt}
+    return {"prompt": image_prompt, "title": title_text}
 
 class ThumbnailFromPromptRequest(BaseModel):
     project_id: str
     prompt: str
     model: str = "gemini-3-pro"
+    image_style: str = "cartoon"
+    video_type: str = "tutorial"
+    title: str = ""
 
 @router.post("/thumbnail-from-prompt")
 async def generate_thumbnail_from_prompt(request: ThumbnailFromPromptRequest, db: AsyncSession = Depends(get_db)):
@@ -219,14 +228,14 @@ async def generate_thumbnail_from_prompt(request: ThumbnailFromPromptRequest, db
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    from app.services.gemini import GeminiService
+    from app.services.ai import GeminiService
     ai_service = GeminiService()
     
     thumbnail_path = f"./storage/{project.id}/thumbnail.png"
     os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
     
     try:
-        await ai_service.generate_thumbnail_image("", request.prompt, thumbnail_path, request.model)
+        await ai_service.generate_thumbnail_image(request.title, request.prompt, thumbnail_path, request.model, request.image_style)
         return {"generated": True, "path": thumbnail_path}
     except Exception as e:
         return {"generated": False, "error": str(e)}
@@ -408,6 +417,9 @@ async def create_video_from_media(request: CreateBubbleVideoRequest, db: AsyncSe
     if not segments:
         raise HTTPException(status_code=400, detail="No segments found")
     
+    # Debug: Print segment media assignments
+    print(f"[CREATE VIDEO] {len(segments)} segments, media_ids: {[s.get('media_id') for s in segments[:10]]}...")
+    
     # Use existing SRT if available (has correct timing from audio merge)
     # Otherwise generate from segments
     subtitle_path = None
@@ -431,6 +443,7 @@ async def create_video_from_media(request: CreateBubbleVideoRequest, db: AsyncSe
             request.animated_subtitles,
             request.subtitle_style,
             request.subtitle_size,
+            request.subtitle_position,
             request.dialogue_mode,
             request.speaker1_position,
             request.speaker2_position,

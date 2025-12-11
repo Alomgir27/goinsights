@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import select
 from app.database import get_db
-from app.services.gemini import GeminiService
+from app.services.ai import GeminiService
 from app.models.project import Project
 
 router = APIRouter()
@@ -26,6 +26,12 @@ class YoutubeInfoRequest(BaseModel):
     project_id: str
     script: str = ""
     language: str = "English"
+
+class SuggestProjectRequest(BaseModel):
+    video_style: str = "dialogue"
+    language: str = "English"
+    duration: int = 60
+    topic: str = ""
 
 @router.post("/summarize")
 async def summarize(request: SummarizeRequest, db: AsyncSession = Depends(get_db)):
@@ -114,4 +120,54 @@ async def generate_youtube_info(request: YoutubeInfoRequest, db: AsyncSession = 
         json.dump(result, f, ensure_ascii=False)
     
     return result
+
+@router.post("/suggest-project")
+async def suggest_project(request: SuggestProjectRequest):
+    import google.generativeai as genai
+    from app.config import get_settings
+    
+    settings = get_settings()
+    genai.configure(api_key=settings.gemini_api_key)
+    
+    style_context = {
+        "dialogue": "educational two-person conversation",
+        "storytelling": "engaging narrative story",
+        "tutorial": "step-by-step how-to guide",
+        "documentary": "informative documentary-style",
+        "podcast": "casual podcast conversation",
+        "product_demo": "product demonstration and features",
+        "testimonial": "customer review/testimonial style",
+        "social_ad": "short punchy social media ad",
+        "promo": "promotional/launch announcement"
+    }
+    
+    style_desc = style_context.get(request.video_style, "video")
+    topic_hint = f" about {request.topic}" if request.topic else ""
+    
+    prompt = f"""Generate 4 creative video project ideas for a {request.duration}s {style_desc} video{topic_hint} in {request.language}.
+
+Each idea should have:
+- A catchy, clickable title (5-10 words)
+- A brief description (1-2 sentences explaining the video concept)
+
+Return ONLY a JSON array:
+[
+  {{"title": "Title Here", "description": "Brief description here"}},
+  ...
+]"""
+    
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    response = model.generate_content(prompt)
+    
+    import re
+    import json as json_lib
+    try:
+        json_match = re.search(r'\[[\s\S]*\]', response.text)
+        if json_match:
+            suggestions = json_lib.loads(json_match.group())
+            return {"suggestions": suggestions[:4]}
+    except:
+        pass
+    
+    return {"suggestions": []}
 

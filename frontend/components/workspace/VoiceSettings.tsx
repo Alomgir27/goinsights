@@ -2,15 +2,7 @@
 
 import React from "react";
 import { Settings, Volume2, Loader2 } from "lucide-react";
-
-interface Voice {
-  id: string;
-  name: string;
-  gender: string;
-  style: string;
-  accent: string;
-  langs: string;
-}
+import type { Voice } from "@/lib/types";
 
 interface VoiceSettingsProps {
   voices: Voice[];

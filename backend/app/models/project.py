@@ -27,6 +27,9 @@ class Project(Base):
     
     # Custom project fields
     prompt = Column(Text)  # User instruction for script generation
+    video_style = Column(String, default="dialogue")  # dialogue, storytelling, tutorial, documentary, podcast
+    character_sheet = Column(JSON)  # Consistent character descriptions for image generation
+    language = Column(String, default="English")  # Output language for script
     
     # Transcript (YouTube projects)
     transcript = Column(JSON)
