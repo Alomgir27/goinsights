@@ -68,6 +68,7 @@ interface FinalVideoSectionProps {
   script: string;
   onGeneratePrompt: (language: string, imageStyle: string, videoType: string) => void;
   onGenerateThumbnailFromPrompt: (prompt: string, model: string, imageStyle: string, videoType: string, title: string) => void;
+  onUploadThumbnail: (file: File) => void;
   onGenerateYoutubeInfo: () => void;
   processing: string;
   thumbnailPrompt: string;
@@ -85,7 +86,7 @@ interface FinalVideoSectionProps {
 }
 
 export default function FinalVideoSection({
-  projectId, projectStatus, language, script, onGeneratePrompt, onGenerateThumbnailFromPrompt, onGenerateYoutubeInfo,
+  projectId, projectStatus, language, script, onGeneratePrompt, onGenerateThumbnailFromPrompt, onUploadThumbnail, onGenerateYoutubeInfo,
   processing, thumbnailPrompt, setThumbnailPrompt, thumbnailTitle, setThumbnailTitle, thumbnailGenerated, thumbnailModel, setThumbnailModel,
   youtubeInfo, setYoutubeInfo, showFinalPreview, setShowFinalPreview, finalVideoTimestamp
 }: FinalVideoSectionProps) {
@@ -299,8 +300,28 @@ export default function FinalVideoSection({
           </div>
         )}
 
+      <div className="flex items-center gap-2 my-2">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-[10px] text-slate-400">OR</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+      
+      <label className="btn-secondary w-full text-xs flex items-center justify-center gap-2 cursor-pointer">
+        <Upload className="w-3 h-3" /> Upload Custom Thumbnail
+        <input 
+          type="file" 
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onUploadThumbnail(file);
+            e.target.value = "";
+          }}
+        />
+      </label>
+
       {thumbnailGenerated && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-2 rounded-lg border border-purple-200">
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-2 rounded-lg border border-purple-200 mt-2">
           <img src={video.getThumbnail(projectId, Date.now())} alt="Thumbnail" className="w-full rounded-lg shadow-md mb-2" />
           <a href={video.getThumbnail(projectId)} download="thumbnail.jpg" className="w-full btn-secondary text-xs flex items-center justify-center gap-1">
             <Download className="w-3 h-3" /> Download Thumbnail
@@ -326,9 +347,14 @@ export default function FinalVideoSection({
               </button>
             )}
             {youtubeConnected && (
-              <span className="text-[10px] text-green-600 flex items-center gap-1">
-                <Check className="w-3 h-3" /> Connected
-              </span>
+              <button 
+                onClick={handleConnectYoutube} 
+                disabled={connectingYoutube}
+                className="text-[10px] text-green-600 hover:text-blue-600 flex items-center gap-1"
+              >
+                {connectingYoutube ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                {connectingYoutube ? "Reconnecting..." : "Connected · Reconnect"}
+              </button>
             )}
             <button onClick={onGenerateYoutubeInfo} disabled={!!processing} className="text-xs text-blue-600 hover:underline">
               {youtubeInfo.title ? "Regenerate" : "Generate"}

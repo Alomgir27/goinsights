@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Play, Wand2, MessageSquare, BookOpen, GraduationCap, Film, Mic, Globe, Sparkles, Megaphone, ShoppingBag, Users, Zap, Home } from "lucide-react";
+import { ArrowLeft, Loader2, Play, Wand2, MessageSquare, BookOpen, GraduationCap, Film, Mic, Globe, Sparkles, Megaphone, ShoppingBag, Users, Zap, Home, TrendingUp, Eye, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { youtube, projects, ai } from "@/lib/api";
 
@@ -11,6 +11,13 @@ type ProjectType = "youtube" | "custom" | "ads" | null;
 interface Suggestion {
   title: string;
   description: string;
+}
+
+interface TrendingTopic {
+  title: string;
+  views: number;
+  channel: string;
+  url: string;
 }
 
 export default function NewProject() {
@@ -28,6 +35,8 @@ export default function NewProject() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestPrompt, setSuggestPrompt] = useState("");
+  const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
 
   const LANGUAGES = ["English", "Spanish", "French", "German", "Italian", "Portuguese", "Bengali", "Hindi", "Chinese", "Japanese", "Korean", "Arabic", "Russian"];
 
@@ -90,6 +99,21 @@ export default function NewProject() {
   const applySuggestion = (s: Suggestion) => {
     setCustomTitle(s.title);
     setCustomPrompt(s.description);
+  };
+
+  const handleGetTrending = async () => {
+    setTrendingLoading(true);
+    try {
+      const { data } = await youtube.getTrendingTopics(videoStyle, suggestPrompt);
+      setTrendingTopics(data.topics || []);
+    } catch { setTrendingTopics([]); }
+    setTrendingLoading(false);
+  };
+
+  const formatViews = (n: number) => {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(0)}K`;
+    return n.toString();
   };
 
   const isAdsType = projectType === "ads";
@@ -238,54 +262,75 @@ export default function NewProject() {
         </div>
       </div>
 
-      {/* Right: AI Suggestions */}
-      <div className="w-72 shrink-0">
-        <div className="card sticky top-8">
-          <div className="flex items-center gap-2 mb-4">
+      {/* Right: AI Suggestions + Trending */}
+      <div className="w-80 shrink-0 space-y-4">
+        {/* AI Suggestions */}
+        <div className="card">
+          <div className="flex items-center gap-2 mb-3">
             <Sparkles className={`w-5 h-5 ${isAdsType ? "text-orange-500" : "text-purple-500"}`} />
             <h4 className="font-semibold text-[#1a1a1a]">AI Suggestions</h4>
           </div>
-          <p className="text-xs text-[#666] mb-3">Get AI-generated title and description ideas.</p>
           
           <input
             type="text"
             value={suggestPrompt}
             onChange={(e) => setSuggestPrompt(e.target.value)}
-            placeholder="Topic or keyword (optional)"
-            className="w-full px-3 py-2 rounded-lg text-sm border border-[#ddd] mb-3 focus:border-purple-400 focus:outline-none"
+            placeholder="Topic or keyword..."
+            className="w-full px-3 py-2 rounded-lg text-sm border border-[#ddd] mb-2 focus:border-purple-400 focus:outline-none"
           />
           
-          <button
-            onClick={handleGetSuggestions}
-            disabled={suggestLoading}
-            className={`w-full mb-4 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-              isAdsType 
-                ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
-                : "bg-purple-100 text-purple-700 hover:bg-purple-200"
-            } disabled:opacity-50`}
-          >
-            {suggestLoading ? <><Loader2 className="w-4 h-4 animate-spin inline mr-1" /> Generating...</> : "Generate Ideas"}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handleGetSuggestions} disabled={suggestLoading}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-colors ${isAdsType ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"} disabled:opacity-50`}>
+              {suggestLoading ? <Loader2 className="w-3 h-3 animate-spin inline" /> : <><Sparkles className="w-3 h-3 inline mr-1" />Ideas</>}
+            </button>
+            <button onClick={handleGetTrending} disabled={trendingLoading}
+              className="flex-1 py-2 px-3 rounded-lg text-xs font-medium bg-rose-100 text-rose-700 disabled:opacity-50">
+              {trendingLoading ? <Loader2 className="w-3 h-3 animate-spin inline" /> : <><TrendingUp className="w-3 h-3 inline mr-1" />Trending</>}
+            </button>
+          </div>
 
           {suggestions.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 mt-3">
               {suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => applySuggestion(s)}
-                  className="w-full p-3 rounded-lg border border-[#eee] hover:border-purple-300 hover:bg-purple-50/50 text-left transition-all"
-                >
-                  <p className="text-sm font-medium text-[#1a1a1a] line-clamp-2">{s.title}</p>
-                  <p className="text-xs text-[#666] mt-1 line-clamp-2">{s.description}</p>
+                <button key={i} onClick={() => applySuggestion(s)}
+                  className="w-full p-2.5 rounded-lg border border-[#eee] hover:border-purple-300 hover:bg-purple-50/50 text-left transition-all">
+                  <p className="text-sm font-medium text-[#1a1a1a] line-clamp-1">{s.title}</p>
+                  <p className="text-xs text-[#666] mt-0.5 line-clamp-1">{s.description}</p>
                 </button>
               ))}
             </div>
           )}
-
-          {suggestions.length === 0 && !suggestLoading && (
-            <p className="text-xs text-[#999] text-center py-4">Click &quot;Generate Ideas&quot; to get suggestions</p>
-          )}
         </div>
+
+        {/* Trending Topics */}
+        {trendingTopics.length > 0 && (
+          <div className="card bg-gradient-to-br from-rose-50 to-orange-50 border-rose-200">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-5 h-5 text-rose-500" />
+              <h4 className="font-semibold text-[#1a1a1a]">Trending Now</h4>
+            </div>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {trendingTopics.map((t, i) => (
+                <div key={i} className="p-2.5 bg-white rounded-lg border border-rose-100 hover:border-rose-300 transition-all">
+                  <p className="text-sm font-medium text-[#1a1a1a] line-clamp-2 cursor-pointer hover:text-rose-600" 
+                     onClick={() => { setCustomTitle(t.title); setCustomPrompt(`Create a video inspired by: ${t.title}`); }}>
+                    {t.title}
+                  </p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] text-[#666] flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> {formatViews(t.views)} views
+                    </span>
+                    <a href={t.url} target="_blank" rel="noopener noreferrer" 
+                       className="text-[10px] text-rose-600 flex items-center gap-0.5 hover:underline">
+                      Watch <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

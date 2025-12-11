@@ -392,6 +392,16 @@ export function useWorkspace(projectId: string) {
     setProcessing("");
   };
 
+  const handleUploadThumbnail = async (file: File) => {
+    if (!project?.id) return;
+    setProcessing("Uploading thumbnail...");
+    try {
+      const { data } = await video.uploadThumbnail(project.id, file);
+      setThumbnailGenerated(data.uploaded || false);
+    } catch {}
+    setProcessing("");
+  };
+
   const handleGenerateYoutubeInfo = async (language: string) => {
     if (!project?.id) return;
     setProcessing(`Generating YouTube info in ${language}...`);
@@ -449,7 +459,7 @@ export function useWorkspace(projectId: string) {
     saving, lastSaved, allAudioGenerated, allClipsExtracted, loadProject, updateProject, saveSegmentsNow,
     handleUpdateSegment, handleBatchUpdateSegments, handleAddSegment, handleRemoveSegment, handleMoveSegment,
     handleGenerateSegment, handleGenerateAll, handleExtractClip, handleExtractAllClips, handleMergeAll,
-    handleDownloadVideo, handleOpenMusicSheet, handleGeneratePrompt, handleGenerateThumbnailFromPrompt,
+    handleDownloadVideo, handleOpenMusicSheet, handleGeneratePrompt, handleGenerateThumbnailFromPrompt, handleUploadThumbnail,
     handleGenerateYoutubeInfo, handleAutoDistributeMedia, handleAutoDistributeEffects, handleApplyVoiceToAll
   };
 }

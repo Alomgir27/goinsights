@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -247,9 +247,28 @@ async def preview_clip(project_id: str, index: int):
         raise HTTPException(status_code=404, detail="Clip not found")
     return FileResponse(clip_path, media_type="video/mp4")
 
+@router.post("/upload-thumbnail")
+async def upload_thumbnail(project_id: str = Form(...), file: UploadFile = File(...)):
+    """Upload a custom thumbnail image"""
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in [".png", ".jpg", ".jpeg", ".webp"]:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+    
+    project_dir = f"./storage/{project_id}"
+    os.makedirs(project_dir, exist_ok=True)
+    thumbnail_path = f"{project_dir}/thumbnail.png"
+    
+    content = await file.read()
+    from PIL import Image
+    import io
+    img = Image.open(io.BytesIO(content))
+    img.save(thumbnail_path, "PNG")
+    
+    return {"uploaded": True, "path": thumbnail_path}
+
+
 @router.get("/thumbnail/{project_id}")
 async def get_thumbnail(project_id: str):
-    # Check for PNG first, then JPG
     png_path = f"./storage/{project_id}/thumbnail.png"
     jpg_path = f"./storage/{project_id}/thumbnail.jpg"
     

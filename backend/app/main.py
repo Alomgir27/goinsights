@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 import time
 from app.database import engine, Base
-from app.api import youtube, ai, clips, projects, voice, video, script, media
+from app.api import youtube, ai, clips, projects, voice, video, script, media, auth
 
 import sys
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', stream=sys.stdout)
@@ -42,6 +42,7 @@ app.include_router(video.router, prefix="/api/video", tags=["Video"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(script.router, prefix="/api/script", tags=["Script"])
 app.include_router(media.router, prefix="/api/media", tags=["Media"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 
 @app.get("/health")
 async def health_check():

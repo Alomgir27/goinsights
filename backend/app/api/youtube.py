@@ -173,6 +173,62 @@ async def get_channel_videos():
     """Get videos from connected YouTube channel - requires OAuth"""
     return {"videos": [], "suggested": []}
 
+
+@router.get("/trending-topics")
+async def get_trending_topics(style: str = "dialogue", topic: str = ""):
+    """Get trending topics based on video style and optional topic keyword"""
+    import subprocess
+    import json
+    import random
+    from datetime import datetime
+    
+    style_queries = {
+        "dialogue": ["conversation interview", "discussion debate", "talk show chat"],
+        "storytelling": ["story explained", "narrative documentary", "real story"],
+        "tutorial": ["tutorial how to", "step by step guide", "learn how"],
+        "documentary": ["documentary facts", "explained deep dive", "investigation"],
+        "podcast": ["podcast episode", "talk show interview", "conversation"],
+        "product_demo": ["product review", "unboxing hands on", "first look"],
+        "testimonial": ["honest review", "real experience", "testimonial"],
+        "social_ad": ["viral trending", "shorts viral", "trending now"],
+        "promo": ["launch trailer", "announcement promo", "coming soon"]
+    }
+    
+    time_filters = ["this week", "this month", "2024", "latest", "new"]
+    queries = style_queries.get(style, ["trending popular viral"])
+    base_query = random.choice(queries)
+    time_filter = random.choice(time_filters)
+    search_query = f"{topic} {base_query} {time_filter}".strip() if topic else f"{base_query} {time_filter}"
+    
+    try:
+        result = subprocess.run(
+            ["yt-dlp", "--cookies", "www.youtube.com_cookies.txt", "-j", "--flat-playlist",
+             "--playlist-end", "15", f"ytsearch15:{search_query}"],
+            capture_output=True, text=True, timeout=30,
+            cwd="/Users/alomgir/workspace/goinsights/backend"
+        )
+        
+        topics = []
+        for line in result.stdout.strip().split('\n'):
+            if not line: continue
+            try:
+                item = json.loads(line)
+                title = item.get("title", "")
+                if title and len(title) > 10:
+                    topics.append({
+                        "title": title,
+                        "views": item.get("view_count", 0),
+                        "channel": item.get("channel", item.get("uploader", "")),
+                        "url": f"https://youtube.com/watch?v={item.get('id', '')}"
+                    })
+            except: pass
+        
+        random.shuffle(topics)
+        return {"topics": topics[:10], "query": search_query}
+    except Exception as e:
+        return {"topics": [], "error": str(e)}
+
+
 @router.get("/suggestions")
 async def get_video_suggestions():
     """Get trending/popular English videos using yt-dlp (no API quota)"""

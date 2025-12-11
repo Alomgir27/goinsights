@@ -2,7 +2,7 @@
 
 import React from "react";
 import { create } from "zustand";
-import { X, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { X, CheckCircle, AlertCircle, Info, Loader2 } from "lucide-react";
 
 type ToastType = "success" | "error" | "info";
 interface Toast { id: string; message: string; type: ToastType; }
@@ -39,6 +39,18 @@ export function ToastContainer(): React.ReactElement {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function ProcessingIndicator({ message }: { message: string }): React.ReactElement | null {
+  if (!message) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-up">
+      <div className="flex items-center gap-3 px-5 py-3 rounded-full bg-slate-900 text-white shadow-2xl">
+        <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+        <span className="text-sm font-medium">{message}</span>
+      </div>
     </div>
   );
 }

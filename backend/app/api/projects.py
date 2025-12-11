@@ -16,6 +16,14 @@ class CustomProjectRequest(BaseModel):
     video_style: str = "dialogue"
     language: str = "English"
 
+def get_project_thumbnail(project_id: str, thumbnail_url: str) -> str | None:
+    if thumbnail_url:
+        return thumbnail_url
+    if os.path.exists(f"./storage/{project_id}/thumbnail.png"):
+        return f"/api/video/thumbnail/{project_id}"
+    return None
+
+
 @router.get("")
 async def list_projects(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Project).order_by(Project.created_at.desc()))
@@ -24,7 +32,7 @@ async def list_projects(db: AsyncSession = Depends(get_db)):
         {
             "id": p.id,
             "title": p.title,
-            "thumbnail": p.thumbnail_url,
+            "thumbnail": get_project_thumbnail(p.id, p.thumbnail_url),
             "status": p.status,
             "project_type": p.project_type or "youtube",
             "created_at": p.created_at.isoformat()

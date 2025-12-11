@@ -13,6 +13,8 @@ export const youtube = {
   handleCallback: (code: string) => api.post("/youtube/auth-callback", { code }),
   getChannelVideos: () => api.get("/youtube/channel-videos"),
   getSuggestions: () => api.get("/youtube/suggestions"),
+  getTrendingTopics: (style: string, topic: string = "") => 
+    api.get(`/youtube/trending-topics?style=${encodeURIComponent(style)}&topic=${encodeURIComponent(topic)}`),
   searchVideos: (query: string) => api.get(`/youtube/search?q=${encodeURIComponent(query)}`),
   searchChannels: (query: string) => api.get(`/youtube/channel/search?q=${encodeURIComponent(query)}`),
   getChannelById: (channelId: string) => api.get(`/youtube/channel/${channelId}/videos`),
@@ -131,6 +133,12 @@ export const video = {
     api.post("/video/thumbnail-prompt", { project_id: projectId, script, language, image_style: imageStyle, video_type: videoType }),
   generateThumbnailFromPrompt: (projectId: string, prompt: string, model: string = "gemini-3-pro", imageStyle: string = "cartoon", videoType: string = "tutorial", title: string = "") => 
     api.post("/video/thumbnail-from-prompt", { project_id: projectId, prompt, model, image_style: imageStyle, video_type: videoType, title }),
+  uploadThumbnail: (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("file", file);
+    return api.post("/video/upload-thumbnail", formData, { headers: { "Content-Type": "multipart/form-data" } });
+  },
   getThumbnail: (projectId: string, t?: number) => `${api.defaults.baseURL}/video/thumbnail/${projectId}?t=${t || Date.now()}`,
   downloadFinal: (projectId: string) => `${api.defaults.baseURL}/video/download/${projectId}`,
   previewFinal: (projectId: string, t?: number) => `${api.defaults.baseURL}/video/preview/${projectId}?t=${t || Date.now()}`,
@@ -163,6 +171,12 @@ export const projects = {
   saveSegments: (id: string, segments: any[]) => api.post(`/projects/${id}/segments`, { segments }),
   createCustom: (title: string, prompt: string = "", duration: number = 60, videoStyle: string = "dialogue", language: string = "English") =>
     api.post("/projects/custom", { title, prompt, duration, video_style: videoStyle, language })
+};
+
+export const auth = {
+  login: (email: string, password: string) => api.post("/auth/login", { email, password }),
+  signup: (name: string, email: string, password: string) => api.post("/auth/signup", { name, email, password }),
+  me: (token: string) => api.get(`/auth/me?token=${token}`)
 };
 
 export default api;

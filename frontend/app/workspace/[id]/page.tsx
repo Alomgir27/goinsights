@@ -14,6 +14,7 @@ import CustomScriptEditor from "@/components/workspace/CustomScriptEditor";
 import MergeOptionsStep from "@/components/workspace/MergeOptionsStep";
 import FinalVideoSection from "@/components/workspace/FinalVideoSection";
 import MusicSheet from "@/components/workspace/MusicSheet";
+import { ProcessingIndicator } from "@/components/Toast";
 
 export default function Workspace(): React.ReactElement {
   const { id } = useParams();
@@ -203,13 +204,7 @@ export default function Workspace(): React.ReactElement {
           </div>
 
           <div className="space-y-4">
-            {ws.processing && (
-              <div className="card bg-blue-50 border-blue-200">
-                <div className="flex items-center gap-2 text-sm text-blue-700">
-                  <Loader2 className="w-4 h-4 animate-spin" /> {ws.processing}
-                </div>
-              </div>
-            )}
+            <ProcessingIndicator message={ws.processing} />
 
             {ws.step === "script" && (ws.projectType === "custom" || ws.projectType === "ads") && (
               <CustomScriptEditor projectId={ws.project.id} initialPrompt={ws.project.prompt} initialScript={ws.project.script}
@@ -326,7 +321,7 @@ export default function Workspace(): React.ReactElement {
                   onMergeAll={ws.handleMergeAll} processing={ws.processing} videoDownloaded={ws.videoDownloaded} projectType={ws.projectType} />
                 <FinalVideoSection projectId={ws.project.id} projectStatus={ws.project.status} language={language} script={ws.project.script || ""}
                   onGeneratePrompt={ws.handleGeneratePrompt} onGenerateThumbnailFromPrompt={ws.handleGenerateThumbnailFromPrompt}
-                  onGenerateYoutubeInfo={() => ws.handleGenerateYoutubeInfo(language)} processing={ws.processing}
+                  onUploadThumbnail={ws.handleUploadThumbnail} onGenerateYoutubeInfo={() => ws.handleGenerateYoutubeInfo(language)} processing={ws.processing}
                   thumbnailPrompt={ws.thumbnailPrompt} setThumbnailPrompt={ws.setThumbnailPrompt}
                   thumbnailTitle={ws.thumbnailTitle} setThumbnailTitle={ws.setThumbnailTitle} thumbnailGenerated={ws.thumbnailGenerated}
                   thumbnailModel={ws.thumbnailModel} setThumbnailModel={ws.setThumbnailModel} youtubeInfo={ws.youtubeInfo}

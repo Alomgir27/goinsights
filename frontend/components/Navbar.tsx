@@ -38,7 +38,7 @@ export default function Navbar(): React.ReactElement {
           <div className={`hidden md:flex items-center transition-all duration-500 ${isScrolled ? "gap-3" : "gap-6"}`}>
             <NavLink href="/" label="Home" active={pathname === "/"} compact={isScrolled} />
             <NavLink href="/projects" label="Projects" active={pathname?.startsWith("/projects") || pathname?.startsWith("/workspace")} compact={isScrolled} />
-            <NavLink href="/connect" label="Connect" active={pathname === "/connect"} compact={isScrolled} />
+            <NavLink href="/pricing" label="Pricing" active={pathname === "/pricing"} compact={isScrolled} />
           </div>
 
           <div className={`flex items-center transition-all duration-500 ${isScrolled ? "gap-2" : "gap-4"}`}>
@@ -48,10 +48,13 @@ export default function Navbar(): React.ReactElement {
                 <span className="hidden sm:inline">Connect YouTube</span>
               </Link>
             )}
-            <Link href="/projects/new" className={`bg-[#1a1a1a] text-white font-semibold rounded-full transition-all duration-300 hover:bg-[#333] ${
+            <Link href="/auth/login" className={`font-medium transition-all duration-300 text-[#666] hover:text-[#1a1a1a] ${isScrolled ? "text-xs" : "text-sm"}`}>
+              Sign in
+            </Link>
+            <Link href="/auth/signup" className={`bg-[#1a1a1a] text-white font-semibold rounded-full transition-all duration-300 hover:bg-[#333] ${
               isScrolled ? "text-xs py-2 px-4" : "text-sm py-2.5 px-5"
             }`}>
-              New Project
+              Get Started
             </Link>
           </div>
         </div>

@@ -31,6 +31,10 @@ ffmpeg-python==0.2.0
 # Image Processing
 Pillow>=10.0.0
 
+# Auth
+bcrypt==4.1.2
+PyJWT==2.8.0
+
 # Utilities
 pydantic==2.5.3
 pydantic-settings==2.1.0

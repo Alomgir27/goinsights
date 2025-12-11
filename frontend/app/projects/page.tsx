@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Trash2, ArrowRight, Folder, Plus, Clock, Youtube, Sparkles, ArrowLeft } from "lucide-react";
 import { projects } from "@/lib/api";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 interface ProjectItem {
   id: string;
@@ -81,7 +82,11 @@ export default function ProjectsPage(): React.ReactElement {
                 {/* Thumbnail */}
                 <div className="relative aspect-video bg-[#f5f5f5]">
                   {p.thumbnail ? (
-                    <Image src={p.thumbnail} alt={p.title} fill className="object-cover" />
+                    <img 
+                      src={p.thumbnail.startsWith("/api") ? `${API_URL.replace("/api", "")}${p.thumbnail}` : p.thumbnail} 
+                      alt={p.title} 
+                      className="absolute inset-0 w-full h-full object-cover" 
+                    />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Folder className="w-10 h-10 text-[#d4d4d4]" />
