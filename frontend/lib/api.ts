@@ -197,6 +197,8 @@ export const wikipedia = {
   search: (query: string, lang: string = "en") => api.get(`/wikipedia/search?q=${encodeURIComponent(query)}&lang=${lang}`),
   categories: () => api.get("/wikipedia/categories"),
   article: (title: string, lang: string = "en") => api.get(`/wikipedia/article/${encodeURIComponent(title)}?lang=${lang}`),
+  commonsMedia: (query: string, limit: number = 50, offset: number = 0, mediaFilter: string = "all") =>
+    api.get(`/wikipedia/commons-media?query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&media_filter=${mediaFilter}`),
   createProject: (title: string, articleTitle: string, extract: string, sections: any[], duration: number, language: string) =>
     api.post("/wikipedia/create-project", { title, article_title: articleTitle, extract, sections, duration, language }),
   collectMedia: (projectId: string, media: any[]) =>

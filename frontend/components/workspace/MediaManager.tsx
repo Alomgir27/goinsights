@@ -142,6 +142,8 @@ export default function MediaManager({ projectId, mediaAssets, onMediaChange, sc
   const [stockPage, setStockPage] = useState(1);
   const [stockHasMore, setStockHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [previewItem, setPreviewItem] = useState<any | null>(null);
+  const [selectedQuality, setSelectedQuality] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get ALL AI-generated image prompts for style consistency
@@ -493,10 +495,11 @@ export default function MediaManager({ projectId, mediaAssets, onMediaChange, sc
     setLoadingMore(false);
   };
 
-  const handleStockDownload = async (item: any) => {
+  const handleStockDownload = async (item: any, qualityUrl?: string) => {
+    const downloadUrl = qualityUrl || item.url;
     setDownloadingStock(item.id);
     try {
-      const { data } = await media.downloadStock(projectId, item.url, "pexels", item.type);
+      const { data } = await media.downloadStock(projectId, downloadUrl, "pexels", item.type);
       const pos = getNextTimePosition();
       const newAsset: MediaAsset = {
         ...data,
@@ -508,10 +511,16 @@ export default function MediaManager({ projectId, mediaAssets, onMediaChange, sc
       };
       onMediaChange([...mediaAssets, newAsset]);
       setStockResults(stockResults.filter(r => r.id !== item.id));
+      setPreviewItem(null);
     } catch (err) {
       console.error("Stock download failed:", err);
     }
     setDownloadingStock(null);
+  };
+
+  const openPreview = (item: any) => {
+    setPreviewItem(item);
+    setSelectedQuality(item.url);
   };
 
   return (
@@ -1048,25 +1057,22 @@ export default function MediaManager({ projectId, mediaAssets, onMediaChange, sc
                 <div className="space-y-3">
                   <div className="grid grid-cols-3 gap-2">
                     {stockResults.map((item) => (
-                      <div key={item.id} className="relative group aspect-video bg-slate-100 rounded-lg overflow-hidden">
+                      <div 
+                        key={item.id} 
+                        className="relative group aspect-video bg-slate-100 rounded-lg overflow-hidden cursor-pointer"
+                        onClick={() => openPreview(item)}
+                      >
                         <img src={item.thumbnail} alt="" className="w-full h-full object-cover" />
                         {item.type === "video" && (
                           <span className="absolute top-1 left-1 text-[9px] bg-black/70 text-white px-1.5 py-0.5 rounded flex items-center gap-1">
                             <Film className="w-2.5 h-2.5" /> {item.duration}s
                           </span>
                         )}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            onClick={() => handleStockDownload(item)}
-                            disabled={downloadingStock === item.id}
-                            className="px-3 py-1.5 bg-teal-500 text-white text-xs rounded-lg font-medium hover:bg-teal-600 disabled:opacity-50"
-                          >
-                            {downloadingStock === item.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              "Add"
-                            )}
-                          </button>
+                        <div className="absolute bottom-1 right-1 text-[9px] bg-black/70 text-white px-1.5 py-0.5 rounded">
+                          {item.width}×{item.height}
+                        </div>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-white text-xs font-medium">Preview</span>
                         </div>
                       </div>
                     ))}
@@ -1088,6 +1094,108 @@ export default function MediaManager({ projectId, mediaAssets, onMediaChange, sc
                   <p className="text-sm">Search for free stock {stockMediaType}</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Media Preview Modal */}
+      {previewItem && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setPreviewItem(null)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden">
+            <button onClick={() => setPreviewItem(null)} className="absolute top-3 right-3 z-10 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white">
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col md:flex-row">
+              <div className="flex-1 bg-black flex items-center justify-center min-h-[300px] max-h-[400px]">
+                {previewItem.type === "video" ? (
+                  <video 
+                    src={previewItem.preview_url || previewItem.url} 
+                    className="max-w-full max-h-full object-contain"
+                    controls
+                    autoPlay
+                    muted
+                  />
+                ) : (
+                  <img 
+                    src={previewItem.preview_url || previewItem.thumbnail} 
+                    alt="Preview" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                )}
+              </div>
+
+              <div className="w-full md:w-72 p-4 bg-slate-50 flex flex-col">
+                <h4 className="font-semibold text-sm mb-1">Media Details</h4>
+                <p className="text-xs text-slate-500 mb-3">by {previewItem.photographer || previewItem.user || "Unknown"}</p>
+
+                <div className="space-y-2 text-xs mb-4">
+                  <div className="flex justify-between py-1.5 border-b border-slate-200">
+                    <span className="text-slate-500">Type</span>
+                    <span className="font-medium capitalize">{previewItem.type}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-200">
+                    <span className="text-slate-500">Resolution</span>
+                    <span className="font-medium">{previewItem.width} × {previewItem.height}</span>
+                  </div>
+                  {previewItem.type === "video" && (
+                    <div className="flex justify-between py-1.5 border-b border-slate-200">
+                      <span className="text-slate-500">Duration</span>
+                      <span className="font-medium">{previewItem.duration}s</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1.5 border-b border-slate-200">
+                    <span className="text-slate-500">Source</span>
+                    <span className="font-medium capitalize">{previewItem.source}</span>
+                  </div>
+                </div>
+
+                {previewItem.qualities && previewItem.qualities.length > 0 && (
+                  <div className="mb-4">
+                    <label className="text-[10px] text-slate-500 mb-1.5 block uppercase tracking-wide">Quality</label>
+                    <div className="space-y-1">
+                      {previewItem.qualities.map((q: any, i: number) => (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedQuality(q.url)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex justify-between items-center transition-all ${
+                            selectedQuality === q.url 
+                              ? "bg-teal-600 text-white" 
+                              : "bg-white border border-slate-200 hover:border-teal-400"
+                          }`}
+                        >
+                          <span>{q.label || q.quality || `${q.width}p`}</span>
+                          <span className="text-[10px] opacity-75">
+                            {q.width}{q.height ? `×${q.height}` : ""}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-auto space-y-2">
+                  <button
+                    onClick={() => handleStockDownload(previewItem, selectedQuality)}
+                    disabled={downloadingStock === previewItem.id}
+                    className="w-full py-2.5 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {downloadingStock === previewItem.id ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Downloading...</>
+                    ) : (
+                      <>Add to Project</>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setPreviewItem(null)}
+                    className="w-full py-2 text-slate-600 text-sm hover:bg-slate-100 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -309,6 +309,36 @@ export default function Home(): React.ReactElement {
         </div>
       </section>
 
+      {/* Demo Video Section */}
+      <section className="py-20 px-6 bg-white">
+        <div className="container max-w-5xl">
+          <div className="text-center mb-10">
+            <div className="badge mb-4">
+              <Play className="w-3.5 h-3.5 text-red-500" />
+              <span>Watch Demo</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a1a] mb-3">See it in action</h2>
+            <p className="text-[#666] max-w-lg mx-auto">Watch how easy it is to create professional videos with GoInsights</p>
+          </div>
+
+          <div className="relative w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-2xl bg-black">
+            <div className="aspect-video">
+              <iframe
+                src="https://www.youtube.com/embed/sWpq0i_NtaU?rel=0&modestbranding=1"
+                title="GoInsights Demo - How to use"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+          </div>
+
+          <p className="text-center text-sm text-[#888] mt-6">
+            Create your first video in under 2 minutes
+          </p>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-16 px-6 bg-[#f5f5f5]">
         <div className="container text-center">

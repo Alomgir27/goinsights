@@ -690,18 +690,91 @@ async def publish_to_youtube(request: PublishRequest, db: AsyncSession = Depends
             if not upload_url:
                 raise HTTPException(status_code=500, detail="No upload URL returned")
             
-            # Step 2: Upload video file
-            with open(video_path, "rb") as f:
-                video_data = f.read()
+            print(f"Upload URL received, starting upload of {video_size / 1024 / 1024:.2f} MB...")
             
-            upload_response = await client.put(
-                upload_url,
-                headers={
-                    "Authorization": f"Bearer {request.access_token}",
-                    "Content-Type": "video/mp4"
-                },
-                content=video_data
-            )
+            # Step 2: Upload video file - always use chunked for files > 20MB
+            if video_size < 20 * 1024 * 1024:  # < 20MB - direct upload
+                print("Using direct upload for small file...")
+                with open(video_path, "rb") as f:
+                    video_data = f.read()
+                
+                upload_response = await client.put(
+                    upload_url,
+                    headers={
+                        "Authorization": f"Bearer {request.access_token}",
+                        "Content-Type": "video/mp4",
+                        "Content-Length": str(video_size)
+                    },
+                    content=video_data,
+                    timeout=300.0
+                )
+                print(f"Direct upload response: {upload_response.status_code}")
+            else:
+                # For larger files, upload in chunks using resumable upload with retry
+                print(f"Using chunked upload for large file ({video_size / 1024 / 1024:.2f} MB)...")
+                chunk_size = 5 * 1024 * 1024  # 5MB chunks (smaller for stability)
+                uploaded = 0
+                upload_response = None
+                max_retries = 3
+                
+                with open(video_path, "rb") as f:
+                    while uploaded < video_size:
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        
+                        chunk_end = min(uploaded + len(chunk) - 1, video_size - 1)
+                        content_range = f"bytes {uploaded}-{chunk_end}/{video_size}"
+                        
+                        # Retry logic for network errors
+                        for attempt in range(max_retries):
+                            try:
+                                print(f"Uploading chunk: {content_range} ({len(chunk) / 1024 / 1024:.2f} MB) - attempt {attempt + 1}")
+                                
+                                chunk_response = await client.put(
+                                    upload_url,
+                                    headers={
+                                        "Authorization": f"Bearer {request.access_token}",
+                                        "Content-Type": "video/mp4",
+                                        "Content-Length": str(len(chunk)),
+                                        "Content-Range": content_range
+                                    },
+                                    content=chunk,
+                                    timeout=180.0  # 3 minutes per chunk
+                                )
+                                
+                                print(f"Chunk response: {chunk_response.status_code}")
+                                break  # Success, exit retry loop
+                                
+                            except (httpx.ReadError, httpx.WriteError, httpx.ConnectError) as e:
+                                print(f"Network error on attempt {attempt + 1}: {e}")
+                                if attempt < max_retries - 1:
+                                    import asyncio
+                                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                                    continue
+                                else:
+                                    raise HTTPException(status_code=500, detail=f"Upload failed after {max_retries} retries: {str(e)}")
+                        
+                        # 308 = Resume Incomplete (more chunks needed), 200/201 = Complete
+                        if chunk_response.status_code not in [200, 201, 308]:
+                            error_text = chunk_response.text[:500]
+                            print(f"Chunk upload failed: {chunk_response.status_code} - {error_text}")
+                            raise HTTPException(status_code=chunk_response.status_code, detail=f"Chunk upload failed: {error_text}")
+                        
+                        uploaded += len(chunk)
+                        percent = (uploaded / video_size) * 100
+                        print(f"Progress: {uploaded / 1024 / 1024:.2f} MB / {video_size / 1024 / 1024:.2f} MB ({percent:.1f}%)")
+                        
+                        upload_response = chunk_response
+                        
+                        if chunk_response.status_code in [200, 201]:
+                            print("Upload complete!")
+                            break
+                
+                if upload_response is None:
+                    raise HTTPException(status_code=500, detail="Upload failed - no response received")
+            
+            print(f"Upload response: {upload_response.status_code}")
             
             if upload_response.status_code not in [200, 201]:
                 raise HTTPException(status_code=upload_response.status_code, detail=f"Upload failed: {upload_response.text}")
@@ -763,10 +836,17 @@ async def publish_to_youtube(request: PublishRequest, db: AsyncSession = Depends
                 "scheduled_at": scheduled_time
             }
             
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=408, detail="Upload timed out. Try again.")
+    except httpx.TimeoutException as e:
+        print(f"Timeout error: {e}")
+        raise HTTPException(status_code=408, detail="Upload timed out. Video might be too large. Try with a shorter video.")
+    except httpx.ReadTimeout as e:
+        print(f"Read timeout: {e}")
+        raise HTTPException(status_code=408, detail="Upload read timeout. Please try again.")
+    except httpx.WriteTimeout as e:
+        print(f"Write timeout: {e}")
+        raise HTTPException(status_code=408, detail="Upload write timeout. Please try again.")
     except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         import traceback
         print(f"Upload error: {traceback.format_exc()}")

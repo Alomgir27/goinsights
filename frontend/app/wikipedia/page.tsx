@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Search, Calendar, FolderOpen, Loader2, Home, Globe, Clock, Check, X, Play } from "lucide-react";
+import { ArrowLeft, Search, Calendar, FolderOpen, Loader2, Home, Globe, Clock, Check, X, Play, Volume2, Image, Film } from "lucide-react";
 import Link from "next/link";
 import { wikipedia } from "@/lib/api";
 
@@ -13,12 +13,20 @@ interface WikiEvent {
   description: string;
   thumbnail: string | null;
   extract: string;
+  media_count?: number;
+  image_count?: number;
+  video_count?: number;
+  audio_count?: number;
 }
 
 interface SearchResult {
   title: string;
   snippet: string;
   pageid: number;
+  media_count?: number;
+  image_count?: number;
+  video_count?: number;
+  audio_count?: number;
 }
 
 interface Category {
@@ -29,8 +37,16 @@ interface Category {
 
 interface MediaItem {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   title?: string;
+  description?: string;
+  object_name?: string;
+  categories?: string;
+  artist?: string;
+  date?: string;
+  width?: number;
+  height?: number;
+  source?: string;
 }
 
 type TabType = "today" | "search" | "categories";
@@ -51,6 +67,12 @@ export default function WikipediaDiscovery() {
   const [creating, setCreating] = useState(false);
   const [viewType, setViewType] = useState<ViewType>("article");
   const [selectedMedia, setSelectedMedia] = useState<Set<number>>(new Set());
+  const [sortByMedia, setSortByMedia] = useState(false);
+  const [loadingMoreMedia, setLoadingMoreMedia] = useState(false);
+  const [mediaOffset, setMediaOffset] = useState(0);
+  const [hasMoreMedia, setHasMoreMedia] = useState(true);
+  const [mediaFilter, setMediaFilter] = useState<"all" | "images" | "videos" | "audio">("all");
+  const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null);
 
   const LANGUAGES = ["English", "Spanish", "French", "German", "Bengali", "Hindi", "Chinese", "Japanese"];
   const LANG_CODES: Record<string, string> = {
@@ -63,7 +85,8 @@ export default function WikipediaDiscovery() {
     if (!selectedArticle) return [];
     const images = (selectedArticle.images || []).map((img: any) => ({ ...img, type: "image" as const }));
     const videos = (selectedArticle.videos || []).map((vid: any) => ({ ...vid, type: "video" as const }));
-    return [...images, ...videos];
+    const audios = (selectedArticle.audios || []).map((aud: any) => ({ ...aud, type: "audio" as const }));
+    return [...images, ...videos, ...audios];
   };
 
   useEffect(() => {
@@ -112,6 +135,8 @@ export default function WikipediaDiscovery() {
 
   const handleSelectTopic = async (title: string) => {
     setLoading(true);
+    setMediaOffset(0);
+    setHasMoreMedia(true);
     try {
       const { data } = await wikipedia.article(title, LANG_CODES[language] || "en");
       setSelectedArticle(data);
@@ -119,6 +144,34 @@ export default function WikipediaDiscovery() {
       setSelectedMedia(new Set());
     } catch { setSelectedArticle(null); }
     setLoading(false);
+  };
+
+  const loadMoreMedia = async () => {
+    if (!selectedArticle || loadingMoreMedia) return;
+    setLoadingMoreMedia(true);
+    try {
+      const newOffset = mediaOffset + 50;
+      const { data } = await wikipedia.commonsMedia(selectedArticle.title, 50, newOffset, mediaFilter);
+      if (data.media && data.media.length > 0) {
+        const existingUrls = new Set(getAllMedia().map((m: MediaItem) => m.url));
+        const newMedia = data.media.filter((m: any) => !existingUrls.has(m.url));
+        setSelectedArticle({
+          ...selectedArticle,
+          images: [...(selectedArticle.images || []), ...newMedia.filter((m: any) => m.type === "image")],
+          videos: [...(selectedArticle.videos || []), ...newMedia.filter((m: any) => m.type === "video")]
+        });
+        setMediaOffset(newOffset);
+        setHasMoreMedia(data.has_more);
+      } else {
+        setHasMoreMedia(false);
+      }
+    } catch { setHasMoreMedia(false); }
+    setLoadingMoreMedia(false);
+  };
+
+  const getSortedResults = () => {
+    if (!sortByMedia) return searchResults;
+    return [...searchResults].sort((a, b) => (b.media_count || 0) - (a.media_count || 0));
   };
 
   const handleProceedToMediaSelect = () => {
@@ -193,30 +246,92 @@ export default function WikipediaDiscovery() {
                 </div>
               </div>
               
-              <h2 className="text-lg font-bold text-[#1a1a1a] mb-4">Select Media for: {selectedArticle.title}</h2>
-              
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 mb-6 max-h-[400px] overflow-y-auto p-1">
-                {getAllMedia().map((item, i) => (
-                  <button key={i} onClick={() => toggleMediaSelection(i)}
-                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedMedia.has(i) ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-slate-300"
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {(["all", "images", "videos", "audio"] as const).map((f) => (
+                  <button key={f} onClick={() => setMediaFilter(f)}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium capitalize transition-all flex items-center gap-1 ${
+                      mediaFilter === f ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}>
-                    {item.type === "video" ? (
-                      <div className="w-full h-full bg-slate-800 flex flex-col items-center justify-center">
-                        <Play className="w-6 h-6 text-white mb-1" />
-                        <span className="text-white text-[9px] font-medium">VIDEO</span>
-                      </div>
-                    ) : (
-                      <img src={item.url} alt="" className="w-full h-full object-cover" />
-                    )}
-                    {selectedMedia.has(i) && (
-                      <div className="absolute top-1 right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
-                        <Check className="w-3 h-3 text-white" />
-                      </div>
-                    )}
+                    {f === "images" && <Image className="w-3 h-3" />}
+                    {f === "videos" && <Film className="w-3 h-3" />}
+                    {f === "audio" && <Volume2 className="w-3 h-3" />}
+                    {f === "all" ? "All" : f}
                   </button>
                 ))}
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-xs text-slate-500">
+                    {(selectedArticle?.images?.length || 0)} 📷 • {(selectedArticle?.videos?.length || 0)} 🎬 • {(selectedArticle?.audios?.length || 0)} 🔊
+                  </span>
+                  {selectedArticle?.has_more_commons && (
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded">+Commons</span>
+                  )}
+                </div>
               </div>
+              
+              <h2 className="text-lg font-bold text-[#1a1a1a] mb-4">Select Media for: {selectedArticle.title}</h2>
+              
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 mb-4 max-h-[400px] overflow-y-auto p-1">
+                {getAllMedia()
+                  .filter(item => mediaFilter === "all" || mediaFilter === item.type + "s" || (mediaFilter === "images" && item.type === "image") || (mediaFilter === "videos" && item.type === "video") || (mediaFilter === "audio" && item.type === "audio"))
+                  .map((item, i) => {
+                    const originalIndex = getAllMedia().findIndex(m => m.url === item.url);
+                    return (
+                      <div key={i} className="relative group">
+                        <button onClick={() => toggleMediaSelection(originalIndex)}
+                          className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                            selectedMedia.has(originalIndex) ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-slate-300"
+                          }`}
+                          title={item.description || item.title || ""}
+                        >
+                          {item.type === "video" ? (
+                            <div className="w-full h-full bg-purple-900 flex flex-col items-center justify-center">
+                              <Play className="w-6 h-6 text-white mb-1" />
+                              <span className="text-white text-[9px] font-medium">VIDEO</span>
+                            </div>
+                          ) : item.type === "audio" ? (
+                            <div className="w-full h-full bg-orange-800 flex flex-col items-center justify-center">
+                              <Volume2 className="w-6 h-6 text-white mb-1" />
+                              <span className="text-white text-[9px] font-medium">AUDIO</span>
+                            </div>
+                          ) : (
+                            <img src={item.url} alt={item.description || ""} className="w-full h-full object-cover" />
+                          )}
+                          {selectedMedia.has(originalIndex) && (
+                            <div className="absolute top-1 right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPreviewMedia(item); }}
+                          className="absolute bottom-1 right-1 w-5 h-5 bg-black/60 hover:bg-black/80 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          title="View details"
+                        >
+                          <Search className="w-3 h-3" />
+                        </button>
+                        {item.description && (
+                          <div className="absolute bottom-0 left-0 right-6 bg-black/70 text-white text-[8px] px-1 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                            {item.description.slice(0, 50)}...
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+              
+              {hasMoreMedia && (
+                <button
+                  onClick={loadMoreMedia}
+                  disabled={loadingMoreMedia}
+                  className="w-full py-2.5 mb-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {loadingMoreMedia ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Loading more media...</>
+                  ) : (
+                    <>Load More from Commons</>
+                  )}
+                </button>
+              )}
               
               <button onClick={handleCreateProject} disabled={creating || selectedMedia.size === 0}
                 className="w-full btn-primary bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -344,13 +459,28 @@ export default function WikipediaDiscovery() {
             </div>
 
             {tab === "search" && (
-              <div className="flex gap-2 mb-6">
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  placeholder="Search Wikipedia..." className="flex-1 input" />
-                <button onClick={handleSearch} disabled={loading} className="btn-primary bg-emerald-600 hover:bg-emerald-700">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                </button>
+              <div className="space-y-3 mb-6">
+                <div className="flex gap-2">
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    placeholder="Search Wikipedia..." className="flex-1 input" />
+                  <button onClick={handleSearch} disabled={loading} className="btn-primary bg-emerald-600 hover:bg-emerald-700">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </button>
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setSortByMedia(!sortByMedia)}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all ${
+                        sortByMedia ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border hover:border-emerald-400"
+                      }`}
+                    >
+                      📸 Sort by Media Count
+                    </button>
+                    <span className="text-xs text-slate-500">{searchResults.length} results</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -370,9 +500,28 @@ export default function WikipediaDiscovery() {
                             <img src={event.thumbnail} alt="" className="w-20 h-20 rounded-lg object-cover shrink-0" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                              <span className="text-sm font-bold text-emerald-700">{event.year}</span>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="text-sm font-bold text-emerald-700">{event.year}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {(event.image_count || 0) > 0 && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 flex items-center gap-0.5">
+                                    <Image className="w-2.5 h-2.5" />{event.image_count}+
+                                  </span>
+                                )}
+                                {(event.video_count || 0) > 0 && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 flex items-center gap-0.5">
+                                    <Film className="w-2.5 h-2.5" />{event.video_count}
+                                  </span>
+                                )}
+                                {(event.audio_count || 0) > 0 && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 flex items-center gap-0.5">
+                                    <Volume2 className="w-2.5 h-2.5" />{event.audio_count}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <h3 className="font-semibold text-[#1a1a1a] line-clamp-1">{event.title || "Historical Event"}</h3>
                             <p className="text-sm text-[#666] mt-1 line-clamp-2">{event.text}</p>
@@ -385,10 +534,34 @@ export default function WikipediaDiscovery() {
 
                 {tab === "search" && searchResults.length > 0 && (
                   <div className="grid md:grid-cols-2 gap-4">
-                    {searchResults.map((result, i) => (
+                    {getSortedResults().map((result, i) => (
                       <button key={i} onClick={() => handleSelectTopic(result.title)}
-                        className="card text-left hover:border-emerald-300 hover:shadow-md transition-all">
-                        <h3 className="font-semibold text-[#1a1a1a] mb-1">{result.title}</h3>
+                        className="card text-left hover:border-emerald-300 hover:shadow-md transition-all relative">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-semibold text-[#1a1a1a] mb-1 flex-1">{result.title}</h3>
+                          {result.media_count !== undefined && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              {(result.image_count || 0) > 0 && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 flex items-center gap-0.5">
+                                  <Image className="w-2.5 h-2.5" />{result.image_count}+
+                                </span>
+                              )}
+                              {(result.video_count || 0) > 0 && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 flex items-center gap-0.5">
+                                  <Film className="w-2.5 h-2.5" />{result.video_count}
+                                </span>
+                              )}
+                              {(result.audio_count || 0) > 0 && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 flex items-center gap-0.5">
+                                  <Volume2 className="w-2.5 h-2.5" />{result.audio_count}
+                                </span>
+                              )}
+                              {result.media_count === 0 && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">0</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         <p className="text-sm text-[#666] line-clamp-2" 
                            dangerouslySetInnerHTML={{ __html: result.snippet }} />
                       </button>
@@ -410,6 +583,97 @@ export default function WikipediaDiscovery() {
               </>
             )}
           </>
+        )}
+
+        {/* Media Preview Modal */}
+        {previewMedia && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewMedia(null)} />
+            <div className="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
+              <button onClick={() => setPreviewMedia(null)} className="absolute top-3 right-3 z-10 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white">
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex flex-col md:flex-row">
+                <div className="flex-1 bg-black flex items-center justify-center min-h-[250px] max-h-[350px]">
+                  {previewMedia.type === "video" ? (
+                    <div className="w-full h-full bg-purple-900 flex flex-col items-center justify-center p-8">
+                      <Play className="w-16 h-16 text-white mb-2" />
+                      <span className="text-white text-sm font-medium">Video File</span>
+                    </div>
+                  ) : previewMedia.type === "audio" ? (
+                    <div className="w-full h-full bg-orange-800 flex flex-col items-center justify-center p-8">
+                      <Volume2 className="w-16 h-16 text-white mb-2" />
+                      <span className="text-white text-sm font-medium">Audio File</span>
+                    </div>
+                  ) : (
+                    <img src={previewMedia.url} alt={previewMedia.description || ""} className="max-w-full max-h-full object-contain" />
+                  )}
+                </div>
+
+                <div className="w-full md:w-72 p-4 bg-slate-50 max-h-[350px] overflow-y-auto">
+                  <h4 className="font-semibold text-sm text-[#1a1a1a] mb-3 line-clamp-2">{previewMedia.title || "Media"}</h4>
+
+                  {previewMedia.description && (
+                    <div className="mb-3">
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wide">Description</label>
+                      <p className="text-xs text-[#333] mt-0.5">{previewMedia.description}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-slate-200">
+                      <span className="text-slate-500">Type</span>
+                      <span className="font-medium capitalize flex items-center gap-1">
+                        {previewMedia.type === "image" && <Image className="w-3 h-3" />}
+                        {previewMedia.type === "video" && <Film className="w-3 h-3" />}
+                        {previewMedia.type === "audio" && <Volume2 className="w-3 h-3" />}
+                        {previewMedia.type}
+                      </span>
+                    </div>
+                    {previewMedia.width && previewMedia.height && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-200">
+                        <span className="text-slate-500">Size</span>
+                        <span className="font-medium">{previewMedia.width} × {previewMedia.height}</span>
+                      </div>
+                    )}
+                    {previewMedia.artist && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-200">
+                        <span className="text-slate-500">Artist</span>
+                        <span className="font-medium truncate max-w-[150px]">{previewMedia.artist}</span>
+                      </div>
+                    )}
+                    {previewMedia.date && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-200">
+                        <span className="text-slate-500">Date</span>
+                        <span className="font-medium">{previewMedia.date}</span>
+                      </div>
+                    )}
+                    {previewMedia.source && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-200">
+                        <span className="text-slate-500">Source</span>
+                        <span className="font-medium capitalize">{previewMedia.source}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {previewMedia.categories && (
+                    <div className="mt-3">
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wide">Categories</label>
+                      <p className="text-[10px] text-slate-600 mt-0.5 line-clamp-3">{previewMedia.categories}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setPreviewMedia(null)}
+                    className="w-full mt-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

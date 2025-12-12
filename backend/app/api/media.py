@@ -90,6 +90,31 @@ class StockDownloadRequest(BaseModel):
     media_type: str = "image"
 
 
+def get_best_video_quality(video_files: list) -> dict:
+    """Get best quality video file sorted by resolution"""
+    sorted_files = sorted(video_files, key=lambda f: (f.get("width", 0) * f.get("height", 0)), reverse=True)
+    best = sorted_files[0] if sorted_files else {}
+    return {
+        "url": best.get("link"),
+        "width": best.get("width"),
+        "height": best.get("height"),
+        "quality": best.get("quality"),
+        "file_type": best.get("file_type")
+    }
+
+def get_video_qualities(video_files: list) -> list:
+    """Return all available quality options"""
+    qualities = []
+    for f in sorted(video_files, key=lambda x: x.get("width", 0) * x.get("height", 0), reverse=True):
+        qualities.append({
+            "url": f.get("link"),
+            "width": f.get("width"),
+            "height": f.get("height"),
+            "quality": f.get("quality"),
+            "file_type": f.get("file_type")
+        })
+    return qualities
+
 @router.get("/stock/search")
 async def search_stock_media(query: str, media_type: str = "photos", per_page: int = 15, orientation: str = "", page: int = 1):
     settings = get_settings()
@@ -115,39 +140,45 @@ async def search_stock_media(query: str, media_type: str = "photos", per_page: i
         data = response.json()
         
         if media_type == "videos":
-            return {
-                "results": [
-                    {
-                        "id": v["id"],
-                        "thumbnail": v["image"],
-                        "url": next((f["link"] for f in v["video_files"] if f.get("quality") == "hd"), v["video_files"][0]["link"]) if v["video_files"] else None,
-                        "width": v["width"],
-                        "height": v["height"],
-                        "duration": v["duration"],
-                        "source": "pexels",
-                        "type": "video"
-                    }
-                    for v in data.get("videos", [])
-                ],
-                "total": data.get("total_results", 0)
-            }
+            results = []
+            for v in data.get("videos", []):
+                best = get_best_video_quality(v.get("video_files", []))
+                results.append({
+                    "id": v["id"],
+                    "thumbnail": v["image"],
+                    "preview_url": v.get("video_files", [{}])[0].get("link"),
+                    "url": best.get("url"),
+                    "width": best.get("width") or v["width"],
+                    "height": best.get("height") or v["height"],
+                    "duration": v["duration"],
+                    "source": "pexels",
+                    "type": "video",
+                    "user": v.get("user", {}).get("name", "Unknown"),
+                    "qualities": get_video_qualities(v.get("video_files", []))
+                })
+            return {"results": results, "total": data.get("total_results", 0)}
         else:
-            return {
-                "results": [
-                    {
-                        "id": p["id"],
-                        "thumbnail": p["src"]["medium"],
-                        "url": p["src"]["large2x"],
-                        "width": p["width"],
-                        "height": p["height"],
-                        "photographer": p["photographer"],
-                        "source": "pexels",
-                        "type": "image"
-                    }
-                    for p in data.get("photos", [])
-                ],
-                "total": data.get("total_results", 0)
-            }
+            results = []
+            for p in data.get("photos", []):
+                src = p.get("src", {})
+                results.append({
+                    "id": p["id"],
+                    "thumbnail": src.get("medium"),
+                    "preview_url": src.get("large"),
+                    "url": src.get("original"),
+                    "width": p["width"],
+                    "height": p["height"],
+                    "photographer": p.get("photographer", "Unknown"),
+                    "source": "pexels",
+                    "type": "image",
+                    "qualities": [
+                        {"label": "Original", "url": src.get("original"), "width": p["width"], "height": p["height"]},
+                        {"label": "Large 2x", "url": src.get("large2x"), "width": min(p["width"], 1880)},
+                        {"label": "Large", "url": src.get("large"), "width": min(p["width"], 940)},
+                        {"label": "Medium", "url": src.get("medium"), "width": min(p["width"], 350)}
+                    ]
+                })
+            return {"results": results, "total": data.get("total_results", 0)}
 
 
 @router.post("/stock/download")

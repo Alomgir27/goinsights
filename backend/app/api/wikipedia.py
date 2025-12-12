@@ -39,6 +39,11 @@ async def get_article(title: str, lang: str = "en", timeout: float = 60.0):
         raise HTTPException(status_code=404, detail=article["error"])
     return article
 
+@router.get("/commons-media")
+async def search_commons_media(query: str, limit: int = 50, offset: int = 0, media_filter: str = "all"):
+    result = await wiki_service.search_commons_media(query, limit, offset, media_filter)
+    return result
+
 class CreateWikiProjectRequest(BaseModel):
     title: str
     article_title: str
