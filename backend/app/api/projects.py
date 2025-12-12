@@ -86,9 +86,9 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
         except:
             pass
     
-    # Load media assets for custom/ads projects
+    # Load media assets
     media_assets = []
-    if project.project_type in ("custom", "ads"):
+    if project.project_type in ("custom", "ads", "wikipedia"):
         result = await db.execute(
             select(MediaAsset).where(MediaAsset.project_id == project_id).order_by(MediaAsset.order)
         )
@@ -115,6 +115,7 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
         "summary": project.summary,
         "script": project.script,
         "segments_data": project.segments_data,
+        "wiki_data": project.wiki_data,
         "status": project.status,
         "created_at": project.created_at.isoformat(),
         "thumbnail_generated": thumbnail_generated,

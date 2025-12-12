@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import ReactPlayer from "react-player";
 import { Clock, Sparkles, Loader2, FileText, Play, RefreshCw, Video, Scissors, ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
-import { ai, voice, video, projects } from "@/lib/api";
+import { ai, voice, video, projects, script } from "@/lib/api";
 import { useWorkspace } from "@/lib/useWorkspace";
 import type { Voice } from "@/lib/types";
 import VoiceSettings from "@/components/workspace/VoiceSettings";
@@ -14,6 +14,7 @@ import CustomScriptEditor from "@/components/workspace/CustomScriptEditor";
 import MergeOptionsStep from "@/components/workspace/MergeOptionsStep";
 import FinalVideoSection from "@/components/workspace/FinalVideoSection";
 import MusicSheet from "@/components/workspace/MusicSheet";
+import WikipediaStep from "@/components/workspace/WikipediaStep";
 import { ProcessingIndicator } from "@/components/Toast";
 
 export default function Workspace(): React.ReactElement {
@@ -112,6 +113,16 @@ export default function Workspace(): React.ReactElement {
       setPlayingPreset(presetId);
     }
   };
+
+  const handleSmartMatchMedia = async () => {
+    if (!ws.project?.id) return;
+    ws.setProcessing("smart-match");
+    try {
+      await script.reassignMedia(ws.project.id);
+      await ws.loadProject();
+    } catch {}
+    ws.setProcessing("");
+  };
   
   if (!ws.project) {
     return (
@@ -135,9 +146,10 @@ export default function Workspace(): React.ReactElement {
                 <h1 className="text-base font-semibold text-slate-900 truncate max-w-sm">{ws.project.title}</h1>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                   ws.projectType === "ads" ? "bg-orange-100 text-orange-600" : 
-                  ws.projectType === "custom" ? "bg-purple-100 text-purple-600" : "bg-red-100 text-red-600"
+                  ws.projectType === "custom" ? "bg-purple-100 text-purple-600" :
+                  ws.projectType === "wikipedia" ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"
                 }`}>
-                  {ws.projectType === "ads" ? "Ads" : ws.projectType === "custom" ? "Custom" : "YouTube"}
+                  {ws.projectType === "ads" ? "Ads" : ws.projectType === "custom" ? "Custom" : ws.projectType === "wikipedia" ? "Wikipedia" : "YouTube"}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -172,6 +184,28 @@ export default function Workspace(): React.ReactElement {
                 </button>
               </div>
             </div>
+            ) : ws.projectType === "wikipedia" ? (
+              <div className="card p-6 bg-gradient-to-br from-emerald-50 to-teal-50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-100">
+                    <FileText className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Wikipedia Documentary</h3>
+                    <p className="text-xs text-slate-500">Historical content video</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="bg-white p-3 rounded-lg">
+                    <span className="text-2xl font-bold text-emerald-600">{ws.segments.length}</span>
+                    <p className="text-xs text-slate-500">Segments</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg">
+                    <span className="text-2xl font-bold text-teal-600">{ws.mediaAssets.length}</span>
+                    <p className="text-xs text-slate-500">Images</p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className={`card p-6 bg-gradient-to-br ${ws.projectType === "ads" ? "from-orange-50 to-amber-50" : "from-purple-50 to-blue-50"}`}>
                 <div className="flex items-center gap-3 mb-4">
@@ -218,6 +252,19 @@ export default function Workspace(): React.ReactElement {
                     voiceId: s.voice_id || "aria", duration: s.duration || 8
                   }));
                   ws.setSegments(newSegments);
+                  handleStepChange("segments");
+                }} />
+            )}
+
+            {ws.step === "script" && ws.projectType === "wikipedia" && (
+              <WikipediaStep projectId={ws.project.id} wikiData={ws.project.wiki_data || null}
+                mediaAssets={ws.mediaAssets} language={language} projectDuration={ws.project.duration || 60}
+                onLanguageChange={handleLanguageChange}
+                processing={ws.processing} setProcessing={ws.setProcessing}
+                onMediaUpdated={ws.loadProject}
+                onScriptGenerated={(script, segs) => {
+                  ws.updateProject({ script });
+                  ws.setSegments(segs);
                   handleStepChange("segments");
                 }} />
             )}
@@ -305,7 +352,9 @@ export default function Workspace(): React.ReactElement {
                   onAutoDistributeMedia={ws.handleAutoDistributeMedia}
                   onAutoDistributeEffects={ws.handleAutoDistributeEffects}
                   onApplyVoiceToAll={ws.handleApplyVoiceToAll}
+                  onApplySilenceToAll={ws.handleApplySilenceToAll}
                   onSaveNow={ws.saveSegmentsNow}
+                  onSmartMatchMedia={handleSmartMatchMedia}
                 />
                 <button onClick={() => handleStepChange("options")} disabled={!ws.allAudioGenerated || (ws.projectType === "youtube" && !ws.allClipsExtracted)}
                   className="btn-primary w-full disabled:opacity-50">
@@ -326,7 +375,7 @@ export default function Workspace(): React.ReactElement {
                   thumbnailTitle={ws.thumbnailTitle} setThumbnailTitle={ws.setThumbnailTitle} thumbnailGenerated={ws.thumbnailGenerated}
                   thumbnailModel={ws.thumbnailModel} setThumbnailModel={ws.setThumbnailModel} youtubeInfo={ws.youtubeInfo}
                   setYoutubeInfo={ws.setYoutubeInfo} showFinalPreview={ws.showFinalPreview} setShowFinalPreview={ws.setShowFinalPreview}
-                  finalVideoTimestamp={ws.finalVideoTimestamp} />
+                  finalVideoTimestamp={ws.finalVideoTimestamp} mediaAssets={ws.mediaAssets} onSelectMediaAsThumbnail={ws.handleSelectMediaAsThumbnail} />
               </>
             )}
 
@@ -342,7 +391,7 @@ export default function Workspace(): React.ReactElement {
       <audio ref={audioRef} onEnded={() => setPlayingPreset(null)} />
       <MusicSheet isOpen={ws.showMusicSheet} onClose={() => { audioRef.current?.pause(); setPlayingPreset(null); ws.setShowMusicSheet(false); }}
         musicPresets={ws.musicPresets} selectedMusic={ws.mergeOptions.bgMusic} onSelect={(id) => ws.setMergeOptions(p => ({ ...p, bgMusic: id }))}
-        playingPreset={playingPreset} loadingPreview={loadingPreview} onPreview={handlePreviewMusic} />
+        playingPreset={playingPreset} loadingPreview={loadingPreview} onPreview={handlePreviewMusic} projectId={ws.project.id} />
     </div>
   );
 }

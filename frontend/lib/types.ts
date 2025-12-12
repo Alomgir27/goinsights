@@ -25,6 +25,7 @@ export interface Segment {
   trimStart?: number;
   trimEnd?: number;
   effect?: "none" | "fade" | "pop" | "slide" | "zoom";
+  silence?: number;
 }
 
 export interface MediaAsset {
@@ -60,7 +61,7 @@ export interface MergeOptions {
 export interface MusicPreset {
   id: string;
   name: string;
-  desc: string;
+  artist?: string;
   cached: boolean;
 }
 
@@ -70,7 +71,7 @@ export interface YoutubeInfo {
   tags: string;
 }
 
-export type ProjectType = "youtube" | "custom" | "ads";
+export type ProjectType = "youtube" | "custom" | "ads" | "wikipedia";
 export type StepType = "script" | "segments" | "options";
 
 export const DEFAULT_MERGE_OPTIONS: MergeOptions = {

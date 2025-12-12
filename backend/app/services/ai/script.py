@@ -241,6 +241,95 @@ Return ONLY JSON:"""
         
         return {"script": result, "segments": []}
     
+    async def generate_wikipedia_script(self, article_content: str, images: list, duration_seconds: int, language: str) -> dict:
+        num_segments = max(5, duration_seconds // 8)
+        media_count = len(images)
+        
+        media_info = []
+        for i, img in enumerate(images):
+            media_type = img.get("type", "image")
+            title = img.get("title", "").replace("File:", "").replace(".jpg", "").replace(".png", "").replace("_", " ")
+            desc = img.get("description", "")[:250]
+            media_info.append(f"{i+1}. [{media_type.upper()}] {title} | {desc}")
+        media_list = "\n".join(media_info) if media_info else "No media available"
+        
+        prompt = f"""Create {num_segments} segments for a {duration_seconds}s documentary in {language}.
+
+TOPIC:
+{article_content[:4000]}
+
+MEDIA LIBRARY ({media_count} items):
+{media_list}
+
+YOUR TASK:
+1. Write narration for each segment (25-45 words)
+2. For EACH segment, pick the BEST matching media by analyzing:
+   - What the segment talks about (people, places, events, objects)
+   - What the media shows (from title and description)
+   - Semantic match: war text → battle media, leader mention → portrait media
+
+MATCHING EXAMPLES:
+- Segment about "soldiers attacked the city" → pick media showing battle/military
+- Segment about "the president announced" → pick media showing the leader/speech
+- Segment about "aftermath destruction" → pick media showing ruins/damage
+- Segment about "map of the region" → pick media showing map/geography
+
+OUTPUT FORMAT:
+[
+  {{"text": "narration text...", "media_index": N, "type": "hook|background|incident|aftermath|conclusion", "duration": 7}}
+]
+
+RULES:
+- {language.upper()} language, convert years to words
+- media_index must be 1-{media_count}
+- Pick media that VISUALLY matches what the narration describes
+- Same media CAN be reused if it fits multiple segments
+
+Return JSON array only:"""
+
+        result = await self._generate(prompt, max_tokens=8192)
+        return self._parse_wikipedia_result(result, images, duration_seconds)
+
+    def _parse_wikipedia_result(self, result: str, images: list, duration_seconds: int) -> dict:
+        try:
+            json_match = re.search(r'\[[\s\S]*\]', result)
+            if json_match:
+                json_str = json_match.group()
+                json_str = re.sub(r',\s*]', ']', json_str)
+                raw_segments = json.loads(json_str)
+                
+                segments = []
+                current_time = 0
+                for s in raw_segments:
+                    dur = s.get("duration", 7)
+                    media_idx = s.get("media_index") or s.get("image_index", 0)
+                    media_id = None
+                    media_type = "image"
+                    
+                    if 0 < media_idx <= len(images):
+                        media = images[media_idx - 1]
+                        media_id = media.get("id")
+                        media_type = media.get("type", "image")
+                    
+                    segments.append({
+                        "text": s.get("text", ""),
+                        "start": current_time,
+                        "end": current_time + dur,
+                        "duration": dur,
+                        "type": s.get("type", "content"),
+                        "media_id": media_id,
+                        "media_type": media_type,
+                        "voice_id": "aria"
+                    })
+                    current_time += dur
+                
+                script = " ".join([s["text"] for s in segments])
+                return {"script": script, "segments": segments}
+        except Exception as e:
+            print(f"Wikipedia script parse error: {e}")
+        
+        return {"script": result, "segments": []}
+
     async def _generate_long_dialogue(self, prompt: str, duration_seconds: int, language: str, total_segments: int, video_style: str = "dialogue") -> dict:
         all_segments = []
         batch_size = 25
@@ -316,3 +405,47 @@ Return ONLY valid JSON array:"""
         script = "\n".join([s["display_text"] for s in all_segments])
         return {"script": script, "segments": all_segments}
 
+    async def reassign_media_to_segments(self, segments: list, media_list: list) -> list:
+        seg_info = []
+        for i, s in enumerate(segments):
+            text = s.get("text", "")[:100]
+            seg_info.append(f"{i+1}. \"{text}\"")
+        
+        media_info = []
+        for i, m in enumerate(media_list):
+            title = m.get("title", "").replace("File:", "").replace("_", " ")[:80]
+            desc = m.get("description", "")[:120]
+            media_info.append(f"{i+1}. [{m.get('type', 'image').upper()}] {title}: {desc}")
+        
+        prompt = f"""Match each segment to the BEST fitting media based on content.
+
+SEGMENTS ({len(segments)}):
+{chr(10).join(seg_info)}
+
+MEDIA ({len(media_list)} items):
+{chr(10).join(media_info)}
+
+For each segment, return the media index (1-{len(media_list)}) that BEST matches the segment content.
+Match by: people mentioned, places, events, objects, actions described.
+
+Return JSON array of {len(segments)} numbers (media indices):
+[3, 1, 5, 2, ...]
+
+Return ONLY the JSON array:"""
+
+        result = await self._generate(prompt, max_tokens=4096)
+        
+        try:
+            json_match = re.search(r'\[[\s\S]*?\]', result)
+            if json_match:
+                indices = json.loads(json_match.group())
+                for i, seg in enumerate(segments):
+                    if i < len(indices):
+                        idx = indices[i]
+                        if 0 < idx <= len(media_list):
+                            seg["media_id"] = media_list[idx - 1].get("id")
+                            seg["media_type"] = media_list[idx - 1].get("type", "image")
+        except Exception as e:
+            print(f"Reassign media error: {e}")
+        
+        return segments

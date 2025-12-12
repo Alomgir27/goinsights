@@ -8,42 +8,30 @@ from app.config import get_settings
 # Chinese, Japanese, Korean, Indonesian, Dutch, Turkish, Filipino, Malay, Tamil, Russian, etc.
 
 VOICES = {
-    # === MULTILINGUAL VOICES (Best for non-English) ===
-    "aria": {"id": "9BWtsMINqrJLrRacOk9x", "name": "Aria", "gender": "Female", "style": "Expressive, Natural", "accent": "Multilingual", "langs": "All 29"},
-    "river": {"id": "SAz9YHcvj6GT2YYXdXww", "name": "River", "gender": "Non-binary", "style": "Calm, Soothing", "accent": "Multilingual", "langs": "All 29"},
-    "bill": {"id": "pqHfZKP75CvOlQylNhV4", "name": "Bill", "gender": "Male", "style": "Documentary, Narrator", "accent": "Multilingual", "langs": "All 29"},
+    # === MULTILINGUAL VOICES (Best for Bengali/Hindi/non-English - use v3 model) ===
+    "aria": {"id": "9BWtsMINqrJLrRacOk9x", "name": "Aria", "gender": "Female", "style": "Expressive, Natural", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "river": {"id": "SAz9YHcvj6GT2YYXdXww", "name": "River", "gender": "Non-binary", "style": "Calm, Narrator", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "bill": {"id": "pqHfZKP75CvOlQylNhV4", "name": "Bill", "gender": "Male", "style": "Documentary, Narrator", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "jessica": {"id": "cgSgspJ2msm6clMCkdW9", "name": "Jessica", "gender": "Female", "style": "Youthful, Trendy", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "brian": {"id": "nPczCjzI2devNBz1zQrb", "name": "Brian", "gender": "Male", "style": "Deep, Narrator", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "lily": {"id": "pFZP5JQG7iQjIQuC4Bku", "name": "Lily", "gender": "Female", "style": "Warm, News", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "matilda": {"id": "XrExE9yKIg1WjnnlVkGX", "name": "Matilda", "gender": "Female", "style": "Professional, Clear", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "chris": {"id": "iP95p4xoKVk53GoZ742B", "name": "Chris", "gender": "Male", "style": "Casual, Natural", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "eric": {"id": "cjVigY5qzO86Huf0OWal", "name": "Eric", "gender": "Male", "style": "Smooth, Classy", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
+    "will": {"id": "bIHbv24MWmeRgasZH58o", "name": "Will", "gender": "Male", "style": "Chill, Conversational", "accent": "Multilingual", "langs": "Bengali, Hindi, 70+ (v3)"},
     
     # === ENGLISH VOICES ===
     "sarah": {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah", "gender": "Female", "style": "Soft, Warm", "accent": "American", "langs": "English+"},
     "alice": {"id": "Xb7hH8MSUJpSbSDYk0k2", "name": "Alice", "gender": "Female", "style": "Confident, Clear", "accent": "British", "langs": "English+"},
-    "rachel": {"id": "21m00Tcm4TlvDq8ikWAM", "name": "Rachel", "gender": "Female", "style": "Deep, Narrator", "accent": "American", "langs": "English+"},
-    "laura": {"id": "FGY2WhTYpPnrIDTdsKH5", "name": "Laura", "gender": "Female", "style": "Calm, Professional", "accent": "American", "langs": "English+"},
-    "roger": {"id": "CwhRBWXzGAHq8TQ4Fs17", "name": "Roger", "gender": "Male", "style": "Authoritative, Deep", "accent": "American", "langs": "English+"},
-    "charlie": {"id": "IKne3meq5aSn9XLyUdCD", "name": "Charlie", "gender": "Male", "style": "Casual, Friendly", "accent": "Australian", "langs": "English+"},
+    "laura": {"id": "FGY2WhTYpPnrIDTdsKH5", "name": "Laura", "gender": "Female", "style": "Casual, Friendly", "accent": "American", "langs": "English+"},
+    "roger": {"id": "CwhRBWXzGAHq8TQ4Fs17", "name": "Roger", "gender": "Male", "style": "Authoritative, Classy", "accent": "American", "langs": "English+"},
+    "charlie": {"id": "IKne3meq5aSn9XLyUdCD", "name": "Charlie", "gender": "Male", "style": "Energetic, Hyped", "accent": "Australian", "langs": "English+"},
     "george": {"id": "JBFqnCBsd6RMkjVDRZzb", "name": "George", "gender": "Male", "style": "Warm, Storyteller", "accent": "British", "langs": "English+"},
-    "adam": {"id": "pNInz6obpgDQGcFmaJgB", "name": "Adam", "gender": "Male", "style": "Deep, Cinematic", "accent": "American", "langs": "English+"},
-    
-    # === SPANISH VOICES ===
-    "mateo": {"id": "wJqPDuzCCHV3BepBXVT8", "name": "Mateo", "gender": "Male", "style": "Warm, Narrator", "accent": "Spanish", "langs": "Spanish+"},
-    "valentina": {"id": "ODq5zmih8GrVes37Dizd", "name": "Valentina", "gender": "Female", "style": "Expressive, Clear", "accent": "Spanish", "langs": "Spanish+"},
-    
-    # === GERMAN VOICES ===
-    "freya": {"id": "jsCqWAovK2LkecY7zXl4", "name": "Freya", "gender": "Female", "style": "Professional, Clear", "accent": "German", "langs": "German+"},
-    
-    # === FRENCH VOICES ===
-    "charlotte": {"id": "XB0fDUnXU5powFXDhCwa", "name": "Charlotte", "gender": "Female", "style": "Elegant, Warm", "accent": "French", "langs": "French+"},
-    
-    # === HINDI VOICES ===
-    "devi": {"id": "vSp2KPOq9TIitCJa7vZ2", "name": "Devi", "gender": "Female", "style": "Expressive, Natural", "accent": "Hindi", "langs": "Hindi+"},
-    
-    # === ARABIC VOICES ===
-    "nadia": {"id": "t0jbNlBVZ17f02VDIeMI", "name": "Nadia", "gender": "Female", "style": "Warm, Clear", "accent": "Arabic", "langs": "Arabic+"},
-    
-    # === JAPANESE VOICES ===
-    "yuki": {"id": "XrExE9yKIg1WjnnlVkGX", "name": "Yuki", "gender": "Female", "style": "Soft, Professional", "accent": "Japanese", "langs": "Japanese+"},
-    
-    # === PORTUGUESE VOICES ===
-    "lucas": {"id": "onwK4e9ZLuTAKqWW03F9", "name": "Lucas", "gender": "Male", "style": "Friendly, Natural", "accent": "Portuguese", "langs": "Portuguese+"},
+    "adam": {"id": "pNInz6obpgDQGcFmaJgB", "name": "Adam", "gender": "Male", "style": "Bold, Confident", "accent": "American", "langs": "English+"},
+    "liam": {"id": "TX3LPaxmHKxFdv7VOQHJ", "name": "Liam", "gender": "Male", "style": "Young, Energetic", "accent": "American", "langs": "English+"},
+    "daniel": {"id": "onwK4e9ZLuTAKqWW03F9", "name": "Daniel", "gender": "Male", "style": "Formal, News", "accent": "British", "langs": "English+"},
+    "callum": {"id": "N2lVS1w4EtoT3dr4eOWO", "name": "Callum", "gender": "Male", "style": "Gravelly, Character", "accent": "American", "langs": "English+"},
+    "harry": {"id": "SOYHLrjzK2X1ezoPC6cr", "name": "Harry", "gender": "Male", "style": "Rough, Warrior", "accent": "American", "langs": "English+"},
 }
 
 DEMO_TEXT = "Welcome to ZapClip. Create stunning video content with AI-powered voice generation."

@@ -96,56 +96,58 @@ def image_to_video(image_path: str, output_path: str, duration: float = 5.0, eff
 
 
 def image_to_video_with_effect(image_path: str, output_path: str, duration: float, effect: str = "none", resize: str = "16:9") -> str:
+    import os
+    if not os.path.exists(image_path):
+        raise Exception(f"Image not found: {image_path}")
+    
     frames = int(duration * 25)
     res, scale_dim = get_resolution(resize)
+    is_gif = image_path.lower().endswith('.gif')
     
-    scale = f"scale={scale_dim}:force_original_aspect_ratio=decrease,pad={scale_dim}:(ow-iw)/2:(oh-ih)/2"
+    fade_dur = min(0.5, duration * 0.15)
+    fade_out = max(0.1, duration - fade_dur)
     
-    # Timing based on duration
-    fade_duration = min(0.8, duration * 0.2)  # Longer fade for visibility
-    fade_out_start = max(0.1, duration - fade_duration)
-    
-    # Pop: happens in first 0.6s or 10% of clip
-    pop_frames = max(15, min(int(frames * 0.1), 20))
-    
-    # Slide: complete in first 25% of clip  
-    slide_frames = max(30, int(frames * 0.25))
-    
-    # Zoom speed
-    zoom_speed = 0.25 / duration
-    
-    print(f"[EFFECT] '{effect}' | duration={duration:.1f}s | fade={fade_duration:.2f}s")
-    
-    if effect == "none":
-        # Subtle slow zoom for "none" to avoid static feeling
-        vf = f"scale=8000:-1,zoompan=z='min(zoom+0.0003,1.05)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}:fps=25"
-    elif effect == "fade":
-        # Strong fade with slight zoom
-        vf = f"scale=8000:-1,zoompan=z='min(zoom+0.0005,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}:fps=25,fade=t=in:st=0:d={fade_duration},fade=t=out:st={fade_out_start}:d={fade_duration}"
-    elif effect == "pop":
-        # Pop: start at 0.7x zoom and quickly scale to 1.05x (overshoot)
-        vf = f"scale=8000:-1,zoompan=z='if(lt(on,{pop_frames}),0.7+0.35*on/{pop_frames},if(lt(on,{pop_frames*2}),1.05-0.05*(on-{pop_frames})/{pop_frames},1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}:fps=25"
-    elif effect == "slide":
-        # Slide from left with slight zoom
-        vf = f"scale=3000:-1,zoompan=z='1.15':x='if(lt(on,{slide_frames}),on*{200/slide_frames},200)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}:fps=25,fade=t=in:st=0:d=0.3"
-    elif effect == "zoom":
-        # Strong continuous zoom
-        vf = f"scale=8000:-1,zoompan=z='min(zoom+{zoom_speed/25},1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}:fps=25"
+    if is_gif:
+        scale_filter = f"scale={scale_dim}:force_original_aspect_ratio=decrease,pad={scale_dim}:(ow-iw)/2:(oh-ih)/2"
+        effects_map = {
+            "none": scale_filter,
+            "fade": f"{scale_filter},fade=t=in:d={fade_dur},fade=t=out:st={fade_out}:d={fade_dur}",
+            "pop": scale_filter,
+            "slide": scale_filter,
+            "zoom": f"{scale_filter},zoompan=z='1+on/{frames}*0.1':d={frames}:s={res}",
+        }
+        cmd = [
+            "ffmpeg", "-y", "-ignore_loop", "0", "-i", image_path,
+            "-vf", effects_map.get(effect, scale_filter),
+            "-t", str(duration), "-r", "25",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast",
+            output_path
+        ]
     else:
-        vf = f"{scale},fade=t=in:st=0:d={fade_duration}"
+        base = f"scale=4000:-1,zoompan=z='1+on/{frames}*0.05':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}"
+        effects_map = {
+            "none": base,
+            "fade": f"{base},fade=t=in:d={fade_dur},fade=t=out:st={fade_out}:d={fade_dur}",
+            "pop": f"scale=4000:-1,zoompan=z='if(lt(on,15),0.85+0.2*on/15,1.05-0.05*min((on-15)/15,1))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+            "slide": f"scale=2400:-1,zoompan=z='1.1':x='if(lt(on,25),on*8,200)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+            "zoom": f"scale=4000:-1,zoompan=z='1+on/{frames}*0.15':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+        }
+        cmd = [
+            "ffmpeg", "-y", "-loop", "1", "-i", image_path,
+            "-vf", effects_map.get(effect, effects_map["none"]),
+            "-t", str(duration), "-r", "25",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast",
+            output_path
+        ]
     
-    cmd = [
-        "ffmpeg", "-y", "-loop", "1", "-i", image_path,
-        "-vf", vf, "-c:v", "libx264", "-t", str(duration),
-        "-pix_fmt", "yuv420p", "-preset", "fast", output_path
-    ]
-    
-    try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as e:
-        print(f"[EFFECT] Failed '{effect}', fallback: {e.stderr[:100] if e.stderr else ''}")
-        cmd[cmd.index("-vf") + 1] = scale
-        subprocess.run(cmd, check=True, capture_output=True)
+    print(f"[EFFECT] Running: {effect} on {os.path.basename(image_path)} {'(GIF)' if is_gif else ''}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        err = result.stderr or ""
+        for line in err.split('\n'):
+            if line.strip() and 'version' not in line.lower() and 'built' not in line.lower():
+                print(f"[EFFECT] {line.strip()}")
+        raise Exception(f"Effect '{effect}' failed for {image_path}")
     
     return output_path
 

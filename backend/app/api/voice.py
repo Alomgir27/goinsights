@@ -36,6 +36,7 @@ class SegmentRequest(BaseModel):
 class MergeSegmentsRequest(BaseModel):
     project_id: str
     segment_count: int
+    silences: list[float] = []
 
 @router.post("/generate-segment")
 async def generate_segment(request: SegmentRequest, db: AsyncSession = Depends(get_db)):
@@ -80,10 +81,9 @@ async def merge_segments(request: MergeSegmentsRequest, db: AsyncSession = Depen
             raise HTTPException(status_code=400, detail=f"Segment {i} not generated")
         
         audio = AudioSegment.from_mp3(seg_path)
-        audio_duration = len(audio) / 1000.0  # Duration in seconds
+        audio_duration = len(audio) / 1000.0
         combined += audio
         
-        # Get text from segment data or SRT file
         seg_text = ""
         if project.segments_data and i < len(project.segments_data):
             seg_text = project.segments_data[i].get("text", "")
@@ -103,6 +103,11 @@ async def merge_segments(request: MergeSegmentsRequest, db: AsyncSession = Depen
             })
         
         current_time += audio_duration
+        
+        silence_ms = int((request.silences[i] if i < len(request.silences) else 0) * 1000)
+        if silence_ms > 0:
+            combined += AudioSegment.silent(duration=silence_ms)
+            current_time += silence_ms / 1000.0
     
     output_path = f"{project_dir}/voice.mp3"
     combined.export(output_path, format="mp3")

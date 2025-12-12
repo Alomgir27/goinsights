@@ -56,7 +56,9 @@ class VideoService(ClipService):
         dialogue_mode: bool = False,
         speaker1_position: str = "top-left",
         speaker2_position: str = "top-right",
-        dialogue_bg_style: str = "transparent"
+        dialogue_bg_style: str = "transparent",
+        bg_music_path: str = None,
+        bg_music_volume: float = 0.3
     ) -> str:
         project_dir = self.storage / project_id
         
@@ -146,7 +148,7 @@ class VideoService(ClipService):
             clip_path = str(project_dir / f"seg_clip_{i}.mp4")
             duration = max(grp["duration"], 0.5)
             
-            print(f"[Group {i}] type={media_type}, duration={duration:.2f}s, segs={grp['seg_indices']}")
+            print(f"[Group {i}] type={media_type}, duration={duration:.2f}s, segs={grp['seg_indices']}, path={media_path}")
             
             if media_type == "video":
                 video_to_clip(media_path, clip_path, duration, resize)
@@ -164,7 +166,7 @@ class VideoService(ClipService):
         if dialogue_mode:
             print(f"[DIALOGUE MODE] Active! speaker1={speaker1_position}, speaker2={speaker2_position}, bg={dialogue_bg_style}")
             base_video = self.merge_clips_final(
-                project_id, temp_clips, audio_path, None, resize, None, 0.3, False, "", 72
+                project_id, temp_clips, audio_path, None, resize, bg_music_path, bg_music_volume, False, "", 72
             )
             return create_dialogue_video(
                 project_dir, base_video, segments, resize,
@@ -173,7 +175,7 @@ class VideoService(ClipService):
         
         return self.merge_clips_final(
             project_id, temp_clips, audio_path, subtitle_path, resize,
-            None, 0.3, animated_subtitles, subtitle_style, subtitle_size, subtitle_position
+            bg_music_path, bg_music_volume, animated_subtitles, subtitle_style, subtitle_size, subtitle_position
         )
 
 

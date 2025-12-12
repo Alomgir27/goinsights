@@ -9,7 +9,7 @@ import { voice, video } from "@/lib/api";
 
 interface SegmentListProps {
   projectId: string;
-  projectType: "youtube" | "custom" | "ads";
+  projectType: "youtube" | "custom" | "ads" | "wikipedia";
   segments: Segment[];
   voices: Voice[];
   mediaAssets: MediaAsset[];
@@ -36,7 +36,9 @@ interface SegmentListProps {
   onAutoDistributeMedia: (batchSize?: number) => void;
   onAutoDistributeEffects: (mode: "cycle" | "single", effect?: string) => void;
   onApplyVoiceToAll: (voiceId: string) => void;
+  onApplySilenceToAll: (mode: "fixed" | "random", value: number, maxValue?: number) => void;
   onSaveNow: () => void;
+  onSmartMatchMedia?: () => void;
   processing: string;
 }
 
@@ -53,13 +55,15 @@ export default function SegmentList({
   videoDownloaded, generatingIndex, extractingIndex, previewClip, script,
   saving, lastSaved, onSegmentUpdate, onBatchUpdateSegments, onAddSegment, onRemoveSegment,
   onMoveSegment, onGenerateAudio, onExtractClip, onExtractAllClips,
-  onGenerateAll, onPreviewToggle, onMediaChange, onAutoDistributeMedia, onAutoDistributeEffects, onApplyVoiceToAll, onSaveNow, processing
+  onGenerateAll, onPreviewToggle, onMediaChange, onAutoDistributeMedia, onAutoDistributeEffects, onApplyVoiceToAll, onApplySilenceToAll, onSaveNow, onSmartMatchMedia, processing
 }: SegmentListProps) {
   const [showScript, setShowScript] = React.useState(false);
   const [selectedEffect, setSelectedEffect] = React.useState("fade");
   const [bulkVoice, setBulkVoice] = React.useState(selectedVoice);
   const [oddVoice, setOddVoice] = React.useState(voices[0]?.id || "");
   const [evenVoice, setEvenVoice] = React.useState(voices[1]?.id || voices[0]?.id || "");
+  const [silenceValue, setSilenceValue] = React.useState(0.5);
+  const [silenceMax, setSilenceMax] = React.useState(1.5);
   
   React.useEffect(() => {
     if (voices.length >= 1 && !oddVoice) setOddVoice(voices[0]?.id);
@@ -134,9 +138,9 @@ export default function SegmentList({
         </div>
       )}
 
-      {(projectType === "custom" || projectType === "ads") && (
+      {(projectType === "custom" || projectType === "ads" || projectType === "wikipedia") && (
         <div className="mb-4 space-y-3">
-          <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+          <div className={`p-3 rounded-lg border ${projectType === "wikipedia" ? "bg-emerald-50 border-emerald-200" : "bg-purple-50 border-purple-200"}`}>
             <MediaManager
               projectId={projectId}
               mediaAssets={mediaAssets}
@@ -174,6 +178,16 @@ export default function SegmentList({
                     <option key={n} value={n}>1:{n}</option>
                   ))}
                 </select>
+                {onSmartMatchMedia && (
+                  <button
+                    onClick={onSmartMatchMedia}
+                    disabled={processing === "smart-match"}
+                    className="py-1 px-2 text-[10px] font-medium bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition-all disabled:opacity-50"
+                    title="AI matches media to segments by content"
+                  >
+                    {processing === "smart-match" ? "⏳ Matching..." : "🧠 Smart Match"}
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] text-slate-500">Effects:</span>
@@ -247,13 +261,37 @@ export default function SegmentList({
                   )}
                 </div>
               )}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-amber-600 font-medium">⏸ Pause:</span>
+                <input type="number" value={silenceValue} onChange={(e) => setSilenceValue(Math.max(0, +e.target.value))}
+                  className="w-12 text-[10px] px-1 py-0.5 border border-amber-200 rounded text-center" min={0} max={5} step={0.5} />
+                <button onClick={() => onApplySilenceToAll("fixed", silenceValue)}
+                  className="text-[10px] px-2 py-1 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600">
+                  All Same
+                </button>
+                <span className="text-[10px] text-amber-400">|</span>
+                <span className="text-[10px] text-amber-500">Range:</span>
+                <input type="number" value={silenceValue} onChange={(e) => setSilenceValue(Math.max(0, +e.target.value))}
+                  className="w-10 text-[10px] px-1 py-0.5 border border-amber-200 rounded text-center" min={0} max={5} step={0.5} />
+                <span className="text-[10px] text-amber-400">-</span>
+                <input type="number" value={silenceMax} onChange={(e) => setSilenceMax(Math.max(silenceValue, +e.target.value))}
+                  className="w-10 text-[10px] px-1 py-0.5 border border-amber-200 rounded text-center" min={0} max={5} step={0.5} />
+                <button onClick={() => onApplySilenceToAll("random", silenceValue, silenceMax)}
+                  className="text-[10px] px-2 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700">
+                  🎲 Random
+                </button>
+                <button onClick={() => onApplySilenceToAll("fixed", 0)}
+                  className="text-[10px] px-2 py-0.5 bg-slate-200 text-slate-600 rounded hover:bg-slate-300">
+                  Clear
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
       {projectType === "youtube" && voices.length > 0 && segments.length > 0 && (
-        <div className="mb-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
+        <div className="mb-3 p-2 bg-orange-50 rounded-lg border border-orange-200 space-y-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] text-orange-600 font-medium">Voice:</span>
             <select
@@ -300,6 +338,29 @@ export default function SegmentList({
                 </button>
               </>
             )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-amber-600 font-medium">⏸ Pause:</span>
+            <input type="number" value={silenceValue} onChange={(e) => setSilenceValue(Math.max(0, +e.target.value))}
+              className="w-12 text-[10px] px-1 py-0.5 border border-amber-200 rounded text-center" min={0} max={5} step={0.5} />
+            <button onClick={() => onApplySilenceToAll("fixed", silenceValue)}
+              className="text-[10px] px-2 py-1 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600">
+              All
+            </button>
+            <span className="text-[10px] text-amber-400">|</span>
+            <input type="number" value={silenceValue} onChange={(e) => setSilenceValue(Math.max(0, +e.target.value))}
+              className="w-10 text-[10px] px-1 py-0.5 border border-amber-200 rounded text-center" min={0} max={5} step={0.5} />
+            <span className="text-[10px] text-amber-400">-</span>
+            <input type="number" value={silenceMax} onChange={(e) => setSilenceMax(Math.max(silenceValue, +e.target.value))}
+              className="w-10 text-[10px] px-1 py-0.5 border border-amber-200 rounded text-center" min={0} max={5} step={0.5} />
+            <button onClick={() => onApplySilenceToAll("random", silenceValue, silenceMax)}
+              className="text-[10px] px-2 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700">
+              🎲
+            </button>
+            <button onClick={() => onApplySilenceToAll("fixed", 0)}
+              className="text-[10px] px-2 py-0.5 bg-slate-200 text-slate-600 rounded hover:bg-slate-300">
+              ✕
+            </button>
           </div>
         </div>
       )}

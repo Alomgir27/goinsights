@@ -13,7 +13,7 @@ interface MergeOptionsStepProps {
   onMergeAll: () => void;
   processing: string;
   videoDownloaded: boolean;
-  projectType: "youtube" | "custom" | "ads";
+  projectType: "youtube" | "custom" | "ads" | "wikipedia";
 }
 
 const SUBTITLE_STYLES = [

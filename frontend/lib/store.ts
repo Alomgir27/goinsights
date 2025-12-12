@@ -22,7 +22,7 @@ interface SegmentData {
 
 interface Project {
   id: string;
-  project_type?: "youtube" | "custom";
+  project_type?: "youtube" | "custom" | "ads" | "wikipedia";
   video_style?: string;
   language?: string;
   videoId?: string;
@@ -34,6 +34,7 @@ interface Project {
   script?: string;
   prompt?: string;
   segments_data?: SegmentData[];
+  wiki_data?: { article_title?: string; extract?: string; sections?: any[] };
   clips: Clip[];
   status: string;
   animatedSubtitles?: boolean;

@@ -76,11 +76,11 @@ export function useWorkspace(projectId: string) {
         duration: data.duration, transcript: data.transcript || [], summary: data.summary,
         script: data.script, segments_data: data.segments_data, clips: [], status: data.status,
         prompt: data.prompt, project_type: data.project_type, video_style: data.video_style,
-        language: data.language
+        language: data.language, wiki_data: data.wiki_data
       });
       if (data.script) setStep("segments");
       
-      if ((data.project_type === "custom" || data.project_type === "ads") && data.media_assets) {
+      if ((data.project_type === "custom" || data.project_type === "ads" || data.project_type === "wikipedia") && data.media_assets) {
         const segs = data.segments_data || [];
         // Reconstruct media assignments from saved segment data
         const mediaAssignments: Record<string, number[]> = {};
@@ -319,7 +319,8 @@ export function useWorkspace(projectId: string) {
       setLastSaved(new Date());
       
       setProcessing("Merging audio segments...");
-      const { data: mergeData } = await voice.mergeSegments(project.id, segments.length);
+      const silences = segments.map(s => s.silence || 0);
+      const { data: mergeData } = await voice.mergeSegments(project.id, segments.length, silences);
       if (mergeData.timing?.length > 0) {
         const updatedSegs = segments.map((seg, i) => ({ 
           ...seg, 
@@ -330,18 +331,19 @@ export function useWorkspace(projectId: string) {
         // Save updated timing
         await projects.saveSegments(project.id, updatedSegs);
       }
-      if (mergeOptions.bgMusic) {
+      if (mergeOptions.bgMusic && !mergeOptions.bgMusic.startsWith("yt:")) {
         setProcessing("Generating background music...");
         await video.generateMusic(project.id, mergeOptions.bgMusic);
       }
       setProcessing("Creating video...");
-      if ((projectType === "custom" || projectType === "ads") && mediaAssets.length > 0) {
+      if ((projectType === "custom" || projectType === "ads" || projectType === "wikipedia") && mediaAssets.length > 0) {
         const mediaTimeline = mediaAssets.map(m => ({ id: m.id, startTime: m.startTime || 0, endTime: m.endTime || 5, assignedSegments: m.assignedSegments || [] }));
         await video.createFromMedia(project.id, mediaTimeline, {
           subtitles: mergeOptions.subtitles, animatedSubtitles: mergeOptions.animatedSubtitles, subtitleStyle: mergeOptions.subtitleStyle,
           subtitleSize: mergeOptions.subtitleSize, subtitlePosition: mergeOptions.subtitlePosition, dialogueMode: mergeOptions.dialogueMode,
           speaker1Position: mergeOptions.speaker1Position, speaker2Position: mergeOptions.speaker2Position,
-          dialogueBgStyle: mergeOptions.dialogueBgStyle, resize: mergeOptions.resize
+          dialogueBgStyle: mergeOptions.dialogueBgStyle, resize: mergeOptions.resize,
+          bgMusic: !!mergeOptions.bgMusic, bgMusicVolume: mergeOptions.bgMusicVolume
         });
       } else {
         await video.mergeWithOptions(project.id, segments, mergeOptions);
@@ -367,7 +369,7 @@ export function useWorkspace(projectId: string) {
     setShowMusicSheet(true);
     try {
       const { data } = await video.getMusicLibrary();
-      setMusicPresets(data.tracks.map((t: any) => ({ id: t.id, name: t.name, desc: t.prompt?.slice(0, 30) || "", cached: t.cached })));
+      setMusicPresets(data.tracks.map((t: any) => ({ id: t.id, name: t.name, artist: t.artist || "", cached: t.cached })));
     } catch {}
   };
 
@@ -382,11 +384,11 @@ export function useWorkspace(projectId: string) {
     setProcessing("");
   };
 
-  const handleGenerateThumbnailFromPrompt = async (prompt: string, model: string, imageStyle: string = "cartoon", videoType: string = "tutorial", title: string = "") => {
+  const handleGenerateThumbnailFromPrompt = async (prompt: string, model: string, imageStyle: string = "cartoon", videoType: string = "tutorial", title: string = "", titlePosition: string = "") => {
     if (!project?.id) return;
     setProcessing(`Generating thumbnail with ${model}...`);
     try {
-      const { data } = await video.generateThumbnailFromPrompt(project.id, prompt, model, imageStyle, videoType, title);
+      const { data } = await video.generateThumbnailFromPrompt(project.id, prompt, model, imageStyle, videoType, title, titlePosition);
       setThumbnailGenerated(data.generated || false);
     } catch {}
     setProcessing("");
@@ -398,6 +400,16 @@ export function useWorkspace(projectId: string) {
     try {
       const { data } = await video.uploadThumbnail(project.id, file);
       setThumbnailGenerated(data.uploaded || false);
+    } catch {}
+    setProcessing("");
+  };
+
+  const handleSelectMediaAsThumbnail = async (mediaId: string, options?: { title?: string; fontSize?: string; fontStyle?: string; position?: string; textColor?: string; strokeColor?: string; strokeWidth?: number; effect?: string }) => {
+    if (!project?.id) return;
+    setProcessing("Creating thumbnail...");
+    try {
+      const { data } = await video.setThumbnailFromMedia(project.id, mediaId, options);
+      setThumbnailGenerated(data.success || false);
     } catch {}
     setProcessing("");
   };
@@ -448,6 +460,15 @@ export function useWorkspace(projectId: string) {
     setSegments(updated);
   };
 
+  const handleApplySilenceToAll = (mode: "fixed" | "random", value: number, maxValue?: number) => {
+    if (segments.length === 0) return;
+    const updated = segments.map(seg => ({
+      ...seg,
+      silence: mode === "fixed" ? value : Math.round((value + Math.random() * ((maxValue || value) - value)) * 10) / 10
+    }));
+    setSegments(updated);
+  };
+
   const allAudioGenerated = segments.length > 0 && segments.every(s => s.audioGenerated);
   const allClipsExtracted = segments.length > 0 && segments.every(s => s.clipExtracted);
 
@@ -460,7 +481,7 @@ export function useWorkspace(projectId: string) {
     handleUpdateSegment, handleBatchUpdateSegments, handleAddSegment, handleRemoveSegment, handleMoveSegment,
     handleGenerateSegment, handleGenerateAll, handleExtractClip, handleExtractAllClips, handleMergeAll,
     handleDownloadVideo, handleOpenMusicSheet, handleGeneratePrompt, handleGenerateThumbnailFromPrompt, handleUploadThumbnail,
-    handleGenerateYoutubeInfo, handleAutoDistributeMedia, handleAutoDistributeEffects, handleApplyVoiceToAll
+    handleGenerateYoutubeInfo, handleAutoDistributeMedia, handleAutoDistributeEffects, handleApplyVoiceToAll, handleApplySilenceToAll, handleSelectMediaAsThumbnail
   };
 }
 

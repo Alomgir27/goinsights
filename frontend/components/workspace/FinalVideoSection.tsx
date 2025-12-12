@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Video, Download, Image, Sparkles, Copy, Check, Youtube, Upload, Loader2, ExternalLink, Globe, Lock, EyeOff, ListVideo, RefreshCw, Clock, Sun, Moon, Baby, User, Tag } from "lucide-react";
-import { video, youtube } from "@/lib/api";
-import type { YoutubeInfo } from "@/lib/types";
+import { Video, Download, Image, Sparkles, Copy, Check, Youtube, Upload, Loader2, ExternalLink, Globe, Lock, EyeOff, ListVideo, RefreshCw, Clock, Sun, Moon, Baby, User, Tag, ImageIcon } from "lucide-react";
+import { video, youtube, media as mediaApi } from "@/lib/api";
+import type { YoutubeInfo, MediaAsset } from "@/lib/types";
 
 const IMAGE_MODELS = [
   { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "Fast" },
@@ -67,7 +67,7 @@ interface FinalVideoSectionProps {
   language: string;
   script: string;
   onGeneratePrompt: (language: string, imageStyle: string, videoType: string) => void;
-  onGenerateThumbnailFromPrompt: (prompt: string, model: string, imageStyle: string, videoType: string, title: string) => void;
+  onGenerateThumbnailFromPrompt: (prompt: string, model: string, imageStyle: string, videoType: string, title: string, titlePosition: string) => void;
   onUploadThumbnail: (file: File) => void;
   onGenerateYoutubeInfo: () => void;
   processing: string;
@@ -83,14 +83,27 @@ interface FinalVideoSectionProps {
   showFinalPreview: boolean;
   setShowFinalPreview: (show: boolean) => void;
   finalVideoTimestamp: number;
+  mediaAssets?: MediaAsset[];
+  onSelectMediaAsThumbnail?: (mediaId: string, options?: { title?: string; fontSize?: string; fontStyle?: string; position?: string; textColor?: string; strokeColor?: string; strokeWidth?: number; effect?: string }) => void;
 }
 
 export default function FinalVideoSection({
   projectId, projectStatus, language, script, onGeneratePrompt, onGenerateThumbnailFromPrompt, onUploadThumbnail, onGenerateYoutubeInfo,
   processing, thumbnailPrompt, setThumbnailPrompt, thumbnailTitle, setThumbnailTitle, thumbnailGenerated, thumbnailModel, setThumbnailModel,
-  youtubeInfo, setYoutubeInfo, showFinalPreview, setShowFinalPreview, finalVideoTimestamp
+  youtubeInfo, setYoutubeInfo, showFinalPreview, setShowFinalPreview, finalVideoTimestamp, mediaAssets, onSelectMediaAsThumbnail
 }: FinalVideoSectionProps) {
   const [copied, setCopied] = useState("");
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [lastUsedMediaId, setLastUsedMediaId] = useState<string | null>(null);
+  const [mediaTitleText, setMediaTitleText] = useState("");
+  const [mediaFontSize, setMediaFontSize] = useState("medium");
+  const [mediaFontStyle, setMediaFontStyle] = useState("bold");
+  const [mediaTitlePosition, setMediaTitlePosition] = useState("bottom");
+  const [mediaTextColor, setMediaTextColor] = useState("#FFFFFF");
+  const [mediaStrokeColor, setMediaStrokeColor] = useState("#000000");
+  const [mediaTitleEffect, setMediaTitleEffect] = useState("glow");
+  const [showReapplyPanel, setShowReapplyPanel] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [publishPrivacy, setPublishPrivacy] = useState<"private" | "unlisted" | "public">("private");
@@ -108,6 +121,8 @@ export default function FinalVideoSection({
   const [thumbnailLanguage, setThumbnailLanguage] = useState(language || "English");
   const [thumbnailStyle, setThumbnailStyle] = useState("cartoon");
   const [videoType, setVideoType] = useState("tutorial");
+  const [addTitleToThumbnail, setAddTitleToThumbnail] = useState(false);
+  const [titlePosition, setTitlePosition] = useState("");
 
   const [playlistError, setPlaylistError] = useState<string>("");
 
@@ -264,17 +279,6 @@ export default function FinalVideoSection({
 
         {thumbnailPrompt && (
           <div className="space-y-2">
-            {thumbnailTitle && (
-              <div>
-                <label className="text-xs text-slate-600 font-medium">Title Text (in {thumbnailLanguage}):</label>
-                <input
-                  value={thumbnailTitle}
-                  onChange={(e) => setThumbnailTitle(e.target.value)}
-                  className="input text-xs mt-1"
-                  placeholder="Title text for thumbnail..."
-                />
-              </div>
-            )}
             <label className="text-xs text-slate-600 font-medium">Image Prompt:</label>
             <textarea
               value={thumbnailPrompt}
@@ -282,6 +286,54 @@ export default function FinalVideoSection({
               className="input text-xs min-h-[80px]"
               placeholder="Describe the thumbnail image..."
             />
+
+            <label className="flex items-center gap-2 cursor-pointer py-1">
+              <input
+                type="checkbox"
+                checked={addTitleToThumbnail}
+                onChange={(e) => {
+                  setAddTitleToThumbnail(e.target.checked);
+                  if (!e.target.checked) setTitlePosition("");
+                }}
+                className="w-4 h-4 accent-purple-500"
+              />
+              <span className="text-xs text-slate-700">Add Title Text to Thumbnail</span>
+            </label>
+
+            {addTitleToThumbnail && (
+              <div className="space-y-2 pl-6 border-l-2 border-purple-200">
+                <input
+                  value={thumbnailTitle}
+                  onChange={(e) => setThumbnailTitle(e.target.value)}
+                  className="input text-xs"
+                  placeholder="Title text..."
+                />
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Title Position</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: "top", icon: "⬆️", label: "Top" },
+                      { id: "center", icon: "⏺️", label: "Center" },
+                      { id: "bottom", icon: "⬇️", label: "Bottom" }
+                    ].map(pos => (
+                      <button
+                        key={pos.id}
+                        onClick={() => setTitlePosition(pos.id)}
+                        className={`py-1.5 rounded-lg text-center transition-all ${
+                          titlePosition === pos.id
+                            ? "bg-purple-100 border-2 border-purple-500"
+                            : "bg-slate-100 border-2 border-transparent hover:border-purple-200"
+                        }`}
+                      >
+                        <span className="text-sm block">{pos.icon}</span>
+                        <span className="text-[10px]">{pos.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-1.5">
               {IMAGE_MODELS.map(m => (
                 <button key={m.id} onClick={() => setThumbnailModel(m.id)}
@@ -291,12 +343,22 @@ export default function FinalVideoSection({
               ))}
             </div>
             <button 
-              onClick={() => onGenerateThumbnailFromPrompt(thumbnailPrompt, thumbnailModel, thumbnailStyle, videoType, thumbnailTitle)} 
-              disabled={!!processing || !thumbnailPrompt} 
+              onClick={() => onGenerateThumbnailFromPrompt(
+                thumbnailPrompt, 
+                thumbnailModel, 
+                thumbnailStyle, 
+                videoType, 
+                addTitleToThumbnail && titlePosition ? thumbnailTitle : "",
+                titlePosition
+              )} 
+              disabled={!!processing || !thumbnailPrompt || (addTitleToThumbnail && !titlePosition)} 
               className="btn-primary w-full text-xs"
             >
               <Image className="w-3 h-3" /> Generate Thumbnail
             </button>
+            {addTitleToThumbnail && !titlePosition && (
+              <p className="text-[10px] text-amber-600">Select a title position to generate</p>
+            )}
           </div>
         )}
 
@@ -320,12 +382,218 @@ export default function FinalVideoSection({
         />
       </label>
 
+      {mediaAssets && mediaAssets.filter(m => m.type === "image").length > 0 && (
+        <>
+          <div className="flex items-center gap-2 my-2">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-[10px] text-slate-400">OR</span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+          
+          <button 
+            onClick={() => { setShowMediaPicker(!showMediaPicker); setSelectedMediaId(null); }} 
+            className="btn-secondary w-full text-xs flex items-center justify-center gap-2"
+          >
+            <ImageIcon className="w-3 h-3" /> Select from Media
+          </button>
+
+          {showMediaPicker && !selectedMediaId && (
+            <div className="grid grid-cols-4 gap-2 p-2 bg-slate-50 rounded-lg max-h-40 overflow-y-auto">
+              {mediaAssets.filter(m => m.type === "image").map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMediaId(m.id)}
+                  className="aspect-video rounded overflow-hidden border-2 border-transparent hover:border-purple-500 transition-all"
+                >
+                  <img src={mediaApi.getUrl(m.id)} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedMediaId && (
+            <div className="p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 space-y-3">
+              <div className="flex items-center gap-2">
+                <img src={mediaApi.getUrl(selectedMediaId)} alt="" className="w-20 h-12 object-cover rounded" />
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-slate-700">Add Title (Optional)</p>
+                  <p className="text-[10px] text-slate-500">Customize text overlay on thumbnail</p>
+                </div>
+                <button onClick={() => setSelectedMediaId(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <input
+                value={mediaTitleText}
+                onChange={(e) => setMediaTitleText(e.target.value)}
+                placeholder="Enter title text..."
+                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-purple-400 focus:outline-none"
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Position</label>
+                  <div className="flex gap-1">
+                    {["top", "center", "bottom"].map(pos => (
+                      <button key={pos} onClick={() => setMediaTitlePosition(pos)}
+                        className={`flex-1 py-1 text-[10px] rounded ${mediaTitlePosition === pos ? "bg-purple-600 text-white" : "bg-white border"}`}>
+                        {pos.charAt(0).toUpperCase() + pos.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Font Size</label>
+                  <div className="flex gap-1">
+                    {["small", "medium", "large", "xlarge"].map(size => (
+                      <button key={size} onClick={() => setMediaFontSize(size)}
+                        className={`flex-1 py-1 text-[10px] rounded ${mediaFontSize === size ? "bg-purple-600 text-white" : "bg-white border"}`}>
+                        {size === "xlarge" ? "XL" : size.charAt(0).toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Font Style</label>
+                  <div className="flex gap-1">
+                    {["normal", "bold"].map(style => (
+                      <button key={style} onClick={() => setMediaFontStyle(style)}
+                        className={`flex-1 py-1 text-[10px] rounded ${mediaFontStyle === style ? "bg-purple-600 text-white" : "bg-white border"}`}>
+                        {style === "bold" ? <strong>Bold</strong> : "Normal"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Effect</label>
+                  <div className="flex gap-1">
+                    {[{id: "glow", label: "✨ Glow"}, {id: "shadow", label: "🌑 Shadow"}, {id: "none", label: "Plain"}].map(eff => (
+                      <button key={eff.id} onClick={() => setMediaTitleEffect(eff.id)}
+                        className={`flex-1 py-1 text-[10px] rounded ${mediaTitleEffect === eff.id ? "bg-purple-600 text-white" : "bg-white border"}`}>
+                        {eff.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-500 mb-1 block">Colors</label>
+                <div className="flex gap-3">
+                  <div className="flex items-center gap-1">
+                    <input type="color" value={mediaTextColor} onChange={(e) => setMediaTextColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+                    <span className="text-[10px]">Text</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input type="color" value={mediaStrokeColor} onChange={(e) => setMediaStrokeColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+                    <span className="text-[10px]">Outline</span>
+                  </div>
+                  <div className="flex gap-1 ml-auto">
+                    {[{bg: "#FFFF00", stroke: "#000000"}, {bg: "#FF0000", stroke: "#FFFFFF"}, {bg: "#00FF00", stroke: "#000000"}].map((preset, i) => (
+                      <button key={i} onClick={() => { setMediaTextColor(preset.bg); setMediaStrokeColor(preset.stroke); }}
+                        className="w-5 h-5 rounded border-2 border-slate-300" style={{background: preset.bg}} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  onSelectMediaAsThumbnail?.(selectedMediaId, {
+                    title: mediaTitleText,
+                    fontSize: mediaFontSize,
+                    fontStyle: mediaFontStyle,
+                    position: mediaTitlePosition,
+                    textColor: mediaTextColor,
+                    strokeColor: mediaStrokeColor,
+                    effect: mediaTitleEffect
+                  });
+                  setLastUsedMediaId(selectedMediaId);
+                  setSelectedMediaId(null);
+                  setShowMediaPicker(false);
+                }}
+                disabled={!!processing}
+                className="btn-primary w-full text-xs"
+              >
+                {mediaTitleText ? "✨ Apply Animated Title" : "Use as Thumbnail"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
       {thumbnailGenerated && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-2 rounded-lg border border-purple-200 mt-2">
-          <img src={video.getThumbnail(projectId, Date.now())} alt="Thumbnail" className="w-full rounded-lg shadow-md mb-2" />
-          <a href={video.getThumbnail(projectId)} download="thumbnail.jpg" className="w-full btn-secondary text-xs flex items-center justify-center gap-1">
-            <Download className="w-3 h-3" /> Download Thumbnail
-          </a>
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-2 rounded-lg border border-purple-200 mt-2 space-y-2">
+          <img src={video.getThumbnail(projectId, Date.now())} alt="Thumbnail" className="w-full rounded-lg shadow-md" />
+          
+          <div className="flex gap-2">
+            <a href={video.getThumbnail(projectId)} download="thumbnail.jpg" className="flex-1 btn-secondary text-xs flex items-center justify-center gap-1">
+              <Download className="w-3 h-3" /> Download
+            </a>
+            {lastUsedMediaId && (
+              <button onClick={() => setShowReapplyPanel(!showReapplyPanel)} className="flex-1 btn-secondary text-xs flex items-center justify-center gap-1">
+                <RefreshCw className="w-3 h-3" /> {showReapplyPanel ? "Hide" : "Reapply Title"}
+              </button>
+            )}
+          </div>
+
+          {showReapplyPanel && lastUsedMediaId && (
+            <div className="p-2 bg-white rounded-lg border space-y-2">
+              <input
+                value={mediaTitleText}
+                onChange={(e) => setMediaTitleText(e.target.value)}
+                placeholder="Title text..."
+                className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg"
+              />
+              <div className="grid grid-cols-3 gap-1">
+                {["top", "center", "bottom"].map(pos => (
+                  <button key={pos} onClick={() => setMediaTitlePosition(pos)}
+                    className={`py-1 text-[10px] rounded ${mediaTitlePosition === pos ? "bg-purple-600 text-white" : "bg-slate-100"}`}>
+                    {pos.charAt(0).toUpperCase() + pos.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {["small", "medium", "large", "xlarge"].map(size => (
+                  <button key={size} onClick={() => setMediaFontSize(size)}
+                    className={`py-1 text-[10px] rounded ${mediaFontSize === size ? "bg-purple-600 text-white" : "bg-slate-100"}`}>
+                    {size === "xlarge" ? "XL" : size.charAt(0).toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 items-center">
+                <div className="flex gap-1 flex-1">
+                  {[{id: "glow", label: "✨"}, {id: "shadow", label: "🌑"}, {id: "none", label: "—"}].map(eff => (
+                    <button key={eff.id} onClick={() => setMediaTitleEffect(eff.id)}
+                      className={`flex-1 py-1 text-[10px] rounded ${mediaTitleEffect === eff.id ? "bg-purple-600 text-white" : "bg-slate-100"}`}>
+                      {eff.label}
+                    </button>
+                  ))}
+                </div>
+                <input type="color" value={mediaTextColor} onChange={(e) => setMediaTextColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer" title="Text color" />
+                <input type="color" value={mediaStrokeColor} onChange={(e) => setMediaStrokeColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer" title="Outline color" />
+              </div>
+              <button
+                onClick={() => {
+                  onSelectMediaAsThumbnail?.(lastUsedMediaId, {
+                    title: mediaTitleText,
+                    fontSize: mediaFontSize,
+                    fontStyle: mediaFontStyle,
+                    position: mediaTitlePosition,
+                    textColor: mediaTextColor,
+                    strokeColor: mediaStrokeColor,
+                    effect: mediaTitleEffect
+                  });
+                }}
+                disabled={!!processing}
+                className="btn-primary w-full text-xs"
+              >
+                {processing ? "Applying..." : "🔄 Reapply Title"}
+              </button>
+            </div>
+          )}
         </div>
       )}
           </div>

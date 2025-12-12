@@ -39,6 +39,7 @@ class Project(Base):
     summary = Column(Text)
     script = Column(Text)
     segments_data = Column(JSON)  # Segments with voice_id, media_id, duration, trim
+    wiki_data = Column(JSON)  # Wikipedia article data for wiki projects
     
     status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)

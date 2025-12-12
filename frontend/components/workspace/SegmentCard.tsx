@@ -9,7 +9,7 @@ interface SegmentCardProps {
   segment: Segment;
   index: number;
   voices: Voice[];
-  projectType: "youtube" | "custom" | "ads";
+  projectType: "youtube" | "custom" | "ads" | "wikipedia";
   videoDownloaded: boolean;
   generatingIndex: number | null;
   extractingIndex: number | null;
@@ -44,7 +44,7 @@ export default function SegmentCard({
 
   return (
     <div className={`p-3 border rounded-lg relative group ${
-      segment.audioGenerated && (segment.clipExtracted || projectType === "custom" || projectType === "ads")
+      segment.audioGenerated && (segment.clipExtracted || projectType === "custom" || projectType === "ads" || projectType === "wikipedia")
         ? "border-green-200 bg-green-50/50"
         : segment.audioGenerated || segment.clipExtracted
         ? "border-blue-200 bg-blue-50/50"
@@ -84,48 +84,49 @@ export default function SegmentCard({
               <span className="text-green-600 font-medium text-[10px]">Out:</span>
               <span className="text-[10px]">{segment.start}s - {segment.end}s</span>
             </div>
+            <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded" title="Silence/pause after">
+              <span className="text-amber-600 font-medium text-[10px]">⏸</span>
+              <input type="number" value={segment.silence || 0} onChange={(e) => onUpdate("silence", Math.max(0, +e.target.value))}
+                className="w-10 px-1 py-0.5 border border-amber-200 rounded text-center text-[10px]" min={0} max={5} step={0.5} />
+            </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-purple-50 px-2 py-1 rounded text-xs">
-              <span className="text-purple-600 font-medium text-[10px]">Duration:</span>
-              {segment.audioGenerated ? (
-                <span className="text-purple-700 font-semibold text-[10px]">{Math.round((segment.end - segment.start) * 10) / 10}s</span>
-              ) : (
-                <>
+          <div className="flex-1 overflow-x-auto scrollbar-thin">
+            <div className="flex items-center gap-2 min-w-max">
+              <div className="flex items-center gap-1 bg-purple-50 px-2 py-1 rounded text-xs shrink-0">
+                <span className="text-purple-600 font-medium text-[10px]">⏱</span>
+                {segment.audioGenerated ? (
+                  <span className="text-purple-700 font-semibold text-[10px]">{Math.round((segment.end - segment.start) * 10) / 10}s</span>
+                ) : (
                   <input type="number" value={segment.duration || 8} onChange={(e) => onUpdate("duration", +e.target.value)}
-                    className="w-12 px-1 py-0.5 border border-slate-200 rounded text-center text-[10px]" min={3} max={60} />
-                  <span className="text-slate-400 text-[10px]">s</span>
+                    className="w-10 px-1 py-0.5 border border-slate-200 rounded text-center text-[10px]" min={3} max={60} />
+                )}
+              </div>
+              <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded text-xs shrink-0" title="Pause after">
+                <span className="text-amber-600 font-medium text-[10px]">⏸</span>
+                <input type="number" value={segment.silence || 0} onChange={(e) => onUpdate("silence", Math.max(0, +e.target.value))}
+                  className="w-10 px-1 py-0.5 border border-amber-200 rounded text-center text-[10px]" min={0} max={5} step={0.5} />
+              </div>
+              {mediaAssets && mediaAssets.length > 0 && (
+                <>
+                  <select value={segment.mediaId || ""} onChange={(e) => onAssignMedia?.(e.target.value || null)}
+                    className="text-[10px] px-2 py-1 border border-slate-200 rounded bg-white shrink-0">
+                    <option value="">🖼️ --</option>
+                    {mediaAssets.map((m, i) => (
+                      <option key={m.id} value={m.id}>{m.type === "image" ? "🖼️" : "🎬"} #{i + 1}</option>
+                    ))}
+                  </select>
+                  <select value={segment.effect || "none"} onChange={(e) => onUpdate("effect", e.target.value)}
+                    className="text-[10px] px-2 py-1 border border-blue-200 rounded bg-blue-50 shrink-0">
+                    <option value="none">✨ None</option>
+                    <option value="fade">Fade</option>
+                    <option value="pop">Pop</option>
+                    <option value="slide">Slide</option>
+                    <option value="zoom">Zoom</option>
+                  </select>
                 </>
               )}
             </div>
-            {mediaAssets && mediaAssets.length > 0 && (
-              <>
-                <select
-                  value={segment.mediaId || ""}
-                  onChange={(e) => onAssignMedia?.(e.target.value || null)}
-                  className="text-[10px] px-2 py-1 border border-slate-200 rounded bg-white"
-                >
-                  <option value="">No media</option>
-                  {mediaAssets.map((m, i) => (
-                    <option key={m.id} value={m.id}>
-                      {m.type === "image" ? "🖼️" : "🎬"} #{i + 1}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={segment.effect || "none"}
-                  onChange={(e) => onUpdate("effect", e.target.value)}
-                  className="text-[10px] px-2 py-1 border border-blue-200 rounded bg-blue-50"
-                >
-                  <option value="none">No Effect</option>
-                  <option value="fade">Fade</option>
-                  <option value="pop">Pop</option>
-                  <option value="slide">Slide</option>
-                  <option value="zoom">Zoom</option>
-                </select>
-              </>
-            )}
           </div>
         )}
 
@@ -164,7 +165,7 @@ export default function SegmentCard({
         )}
         <button onClick={onGenerateAudio} disabled={isGenerating || isExtracting}
           className={`text-xs py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 font-medium transition-all ${
-            (projectType === "custom" || projectType === "ads") ? "col-span-2" : ""
+            (projectType === "custom" || projectType === "ads" || projectType === "wikipedia") ? "col-span-2" : ""
           } ${
             isGenerating ? "bg-blue-600 text-white" :
             segment.audioGenerated ? "bg-emerald-500 text-white" :

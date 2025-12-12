@@ -107,7 +107,8 @@ OUTPUT JSON only:
         return {"title": parsed_title, "image": parsed_image}
     
     async def generate_thumbnail_image(self, title: str, image_prompt: str, output_path: str, 
-                                       model: str = "gemini-2.5-flash", image_style: str = "cartoon") -> str:
+                                       model: str = "gemini-2.5-flash", image_style: str = "cartoon",
+                                       title_position: str = "") -> str:
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         style_desc = self.STYLE_MAP.get(image_style, self.STYLE_MAP["cartoon"])
         
@@ -126,10 +127,12 @@ MUST FOLLOW:
 
 DO NOT add extra elements, complex backgrounds, or clutter."""
         
-        if title:
+        if title and title_position:
+            position_map = {"top": "at the TOP", "center": "in the CENTER", "bottom": "at the BOTTOM"}
+            pos_text = position_map.get(title_position, "in the CENTER")
             full_prompt += f"""
-5. MUST include the exact text "{title.upper()}" prominently in the CENTER
-6. Text should be LARGE, BOLD, easy to read - white or bright color with dark outline/shadow"""
+6. MUST include the exact text "{title.upper()}" prominently {pos_text} of the image
+7. Text should be LARGE, BOLD, easy to read - white or bright color with dark outline/shadow"""
 
         if model == "dall-e-3":
             img_bytes = await self._generate_dalle(full_prompt)

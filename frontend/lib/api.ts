@@ -34,11 +34,6 @@ export const ai = {
     api.post("/ai/suggest-project", { video_style: videoStyle, language, duration, topic })
 };
 
-export const script = {
-  generate: (projectId: string, prompt: string, duration: number, language: string = "English", numSegments: number = 0, videoStyle: string = "dialogue") =>
-    api.post("/script/generate", { project_id: projectId, prompt, duration_seconds: duration, language, num_segments: numSegments, video_style: videoStyle })
-};
-
 export const media = {
   upload: (projectId: string, file: File) => {
     const formData = new FormData();
@@ -111,8 +106,8 @@ export const voice = {
   generateSegment: (projectId: string, segmentIndex: number, text: string, voiceId: string, speed: number = 1.0, stability: number = 0.5, model: string = "v2") =>
     api.post("/voice/generate-segment", { project_id: projectId, segment_index: segmentIndex, text, voice: voiceId, speed, stability, model }),
   
-  mergeSegments: (projectId: string, segmentCount: number) =>
-    api.post("/voice/merge-segments", { project_id: projectId, segment_count: segmentCount }),
+  mergeSegments: (projectId: string, segmentCount: number, silences: number[] = []) =>
+    api.post("/voice/merge-segments", { project_id: projectId, segment_count: segmentCount, silences }),
   
   checkExistingSegments: (projectId: string) => api.get(`/voice/check-segments/${projectId}`),
   
@@ -131,21 +126,37 @@ export const video = {
     api.post("/video/merge", { project_id: projectId, segments, subtitles: options.subtitles, animated_subtitles: options.animatedSubtitles, subtitle_style: options.subtitleStyle, resize: options.resize, bg_music: options.bgMusic, bg_music_volume: options.bgMusicVolume }),
   generateThumbnailPrompt: (projectId: string, script: string, language: string = "English", imageStyle: string = "cartoon", videoType: string = "tutorial") => 
     api.post("/video/thumbnail-prompt", { project_id: projectId, script, language, image_style: imageStyle, video_type: videoType }),
-  generateThumbnailFromPrompt: (projectId: string, prompt: string, model: string = "gemini-3-pro", imageStyle: string = "cartoon", videoType: string = "tutorial", title: string = "") => 
-    api.post("/video/thumbnail-from-prompt", { project_id: projectId, prompt, model, image_style: imageStyle, video_type: videoType, title }),
+  generateThumbnailFromPrompt: (projectId: string, prompt: string, model: string = "gemini-3-pro", imageStyle: string = "cartoon", videoType: string = "tutorial", title: string = "", titlePosition: string = "") => 
+    api.post("/video/thumbnail-from-prompt", { project_id: projectId, prompt, model, image_style: imageStyle, video_type: videoType, title, title_position: titlePosition }),
   uploadThumbnail: (projectId: string, file: File) => {
     const formData = new FormData();
     formData.append("project_id", projectId);
     formData.append("file", file);
     return api.post("/video/upload-thumbnail", formData, { headers: { "Content-Type": "multipart/form-data" } });
   },
+  setThumbnailFromMedia: (projectId: string, mediaId: string, options?: { title?: string; fontSize?: string; fontStyle?: string; position?: string; textColor?: string; strokeColor?: string; strokeWidth?: number; effect?: string }) =>
+    api.post("/video/set-thumbnail-from-media", { 
+      project_id: projectId, 
+      media_id: mediaId,
+      title: options?.title || "",
+      font_size: options?.fontSize || "medium",
+      font_style: options?.fontStyle || "bold",
+      position: options?.position || "bottom",
+      text_color: options?.textColor || "#FFFFFF",
+      stroke_color: options?.strokeColor || "#000000",
+      stroke_width: options?.strokeWidth || 3,
+      effect: options?.effect || "glow"
+    }),
   getThumbnail: (projectId: string, t?: number) => `${api.defaults.baseURL}/video/thumbnail/${projectId}?t=${t || Date.now()}`,
   downloadFinal: (projectId: string) => `${api.defaults.baseURL}/video/download/${projectId}`,
   previewFinal: (projectId: string, t?: number) => `${api.defaults.baseURL}/video/preview/${projectId}?t=${t || Date.now()}`,
   getMusicLibrary: () => api.get("/video/music-library"),
+  searchMusic: (query: string) => api.get(`/video/search-music?q=${encodeURIComponent(query)}`),
+  previewSearchMusic: (videoId: string) => `${api.defaults.baseURL}/video/preview-search-music/${videoId}`,
+  downloadMusic: (projectId: string, videoId: string) => api.post("/video/download-music", { project_id: projectId, video_id: videoId }),
   generateMusic: (projectId: string, presetId: string) => api.post("/video/generate-music", { project_id: projectId, preset_id: presetId }),
   musicPreview: (presetId: string) => `${api.defaults.baseURL}/video/music-preview/${presetId}`,
-  createFromMedia: (projectId: string, mediaTimeline: any[], options: { subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; subtitleSize: number; subtitlePosition?: string; dialogueMode?: boolean; speaker1Position?: string; speaker2Position?: string; dialogueBgStyle?: string; resize: string }) =>
+  createFromMedia: (projectId: string, mediaTimeline: any[], options: { subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; subtitleSize: number; subtitlePosition?: string; dialogueMode?: boolean; speaker1Position?: string; speaker2Position?: string; dialogueBgStyle?: string; resize: string; bgMusic?: boolean; bgMusicVolume?: number }) =>
     api.post("/video/create-with-bubbles", { 
       project_id: projectId, 
       bubble_positions: [], 
@@ -159,7 +170,9 @@ export const video = {
       dialogue_mode: options.dialogueMode || false,
       speaker1_position: options.speaker1Position || "top-left",
       speaker2_position: options.speaker2Position || "top-right",
-      dialogue_bg_style: options.dialogueBgStyle || "transparent"
+      dialogue_bg_style: options.dialogueBgStyle || "transparent",
+      bg_music: options.bgMusic || false,
+      bg_music_volume: options.bgMusicVolume || 0.3
     })
 };
 
@@ -177,6 +190,26 @@ export const auth = {
   login: (email: string, password: string) => api.post("/auth/login", { email, password }),
   signup: (name: string, email: string, password: string) => api.post("/auth/signup", { name, email, password }),
   me: (token: string) => api.get(`/auth/me?token=${token}`)
+};
+
+export const wikipedia = {
+  onThisDay: (lang: string = "en") => api.get(`/wikipedia/on-this-day?lang=${lang}`),
+  search: (query: string, lang: string = "en") => api.get(`/wikipedia/search?q=${encodeURIComponent(query)}&lang=${lang}`),
+  categories: () => api.get("/wikipedia/categories"),
+  article: (title: string, lang: string = "en") => api.get(`/wikipedia/article/${encodeURIComponent(title)}?lang=${lang}`),
+  createProject: (title: string, articleTitle: string, extract: string, sections: any[], duration: number, language: string) =>
+    api.post("/wikipedia/create-project", { title, article_title: articleTitle, extract, sections, duration, language }),
+  collectMedia: (projectId: string, media: any[]) =>
+    api.post("/wikipedia/collect-media", { project_id: projectId, media })
+};
+
+export const script = {
+  generate: (projectId: string, prompt: string, duration: number, language: string, numSegments: number, videoStyle: string) =>
+    api.post("/script/generate", { project_id: projectId, prompt, duration_seconds: duration, language, num_segments: numSegments, video_style: videoStyle }),
+  generateWiki: (projectId: string, duration: number, language: string) =>
+    api.post("/script/generate-wiki", { project_id: projectId, duration_seconds: duration, language }),
+  reassignMedia: (projectId: string) =>
+    api.post("/script/reassign-media", { project_id: projectId })
 };
 
 export default api;
