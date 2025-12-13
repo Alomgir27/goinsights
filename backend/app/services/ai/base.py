@@ -16,8 +16,8 @@ class BaseAIService:
         else:
             self.openai = None
     
-    async def _generate(self, prompt: str, max_tokens: int = 4096) -> str:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+    async def _generate(self, prompt: str, max_tokens: int = 8192) -> str:
+        model = genai.GenerativeModel("gemini-3-pro-preview")
         response = model.generate_content(prompt)
         return response.text
 

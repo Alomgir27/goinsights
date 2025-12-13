@@ -19,7 +19,7 @@ CONTENT RULES:
 4. End with a memorable conclusion or lesson
 
 TECHNICAL RULES:
-1. Each segment = one narrative beat (20-50 words)
+1. Each segment = one narrative beat (5-25 words)
 2. Natural pauses between segments
 3. Use "Narrator" as speaker name
 
@@ -51,7 +51,7 @@ CONTENT RULES:
 4. End with summary and next steps
 
 TECHNICAL RULES:
-1. Each segment = one step or concept (20-50 words)
+1. Each segment = one step or concept (5-25 words)
 2. Use "Instructor" as speaker name
 3. Keep language simple and direct
 
@@ -83,7 +83,7 @@ CONTENT RULES:
 4. Conclude with broader implications
 
 TECHNICAL RULES:
-1. Each segment = one information point (20-50 words)
+1. Each segment = one information point (5-25 words)
 2. Use "Narrator" as speaker name
 3. Maintain serious, credible tone
 
@@ -115,7 +115,7 @@ CONTENT RULES:
 4. Feel like eavesdropping on friends talking
 
 TECHNICAL RULES:
-1. Each segment = one host's turn (20-50 words)
+1. Each segment = one host's turn (5-25 words)
 2. Use casual names like Mike and Lisa
 3. Include natural reactions ("Oh wow", "Right?")
 
@@ -147,7 +147,7 @@ CONTENT RULES:
 4. CTA: End with strong call to action
 
 TECHNICAL RULES:
-1. Each segment = one feature or benefit (15-40 words)
+1. Each segment = one feature or benefit (5-25 words)
 2. Use "Presenter" as speaker name
 3. Keep tone enthusiastic but credible
 4. Include specific numbers/results when possible
@@ -180,7 +180,7 @@ CONTENT RULES:
 4. Recommend to others
 
 TECHNICAL RULES:
-1. Each segment = one part of their story (20-40 words)
+1. Each segment = one part of their story (5-25 words)
 2. Use a realistic customer name
 3. Include specific details and numbers
 4. Keep it genuine, avoid overly salesy tone
@@ -213,7 +213,7 @@ CONTENT RULES:
 4. Clear CTA at the end
 
 TECHNICAL RULES:
-1. Each segment = one punchy statement (10-25 words)
+1. Each segment = one punchy statement (5-25 words)
 2. Use "Voiceover" as speaker name
 3. Short, punchy sentences
 4. Include trending phrases or hooks
@@ -246,7 +246,7 @@ CONTENT RULES:
 4. End with date/CTA and urgency
 
 TECHNICAL RULES:
-1. Each segment = one dramatic beat (15-35 words)
+1. Each segment = one dramatic beat (5-25 words)
 2. Use "Announcer" as speaker name
 3. Use powerful, evocative language
 4. Create a sense of occasion
@@ -280,7 +280,7 @@ CONTENT RULES:
 TECHNICAL RULES:
 1. Each segment = ONE speaker's complete turn (all sentences before other responds)
 2. Alternate: Learner asks -> Expert explains -> Learner follows up -> Expert answers
-3. Each segment 20-50 words, 5-10 seconds
+3. Each segment 5-25 words, 3-8 seconds
 4. START directly with dialogue - no intros or greetings
 5. Use simple names like Alex and Sam but my recommendation is to use names that are easy to understand and remember. I prefer different names not always Alex and Sam.
 

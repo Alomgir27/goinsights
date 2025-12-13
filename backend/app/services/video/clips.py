@@ -44,7 +44,7 @@ class ClipService(BaseVideoService):
         cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file)]
         
         if audio_path and os.path.exists(audio_path):
-            cmd.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a", "-shortest"])
+            cmd.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a"])
         
         if subtitle_path and os.path.exists(subtitle_path):
             cmd.extend(["-vf", f"subtitles={subtitle_path}"])
@@ -74,7 +74,7 @@ class ClipService(BaseVideoService):
         cmd = ["ffmpeg", "-y", "-i", source]
         
         if audio_path and os.path.exists(audio_path):
-            cmd.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a", "-shortest"])
+            cmd.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a"])
         
         cmd.extend([
             "-vf", ",".join(vf_filters),

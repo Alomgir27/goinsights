@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Loader2, Play, FileText, Mic, Scissors, Zap, Youtube, Image, Music, Wand2, MessageSquare, Type } from "lucide-react";
+import { ArrowRight, Loader2, Play, FileText, Mic, Scissors, Zap, Youtube, Image, Music, Wand2, MessageSquare, Type, BookOpen, Smartphone } from "lucide-react";
 import { youtube } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import Navbar from "@/components/Navbar";
@@ -163,6 +163,52 @@ export default function Home(): React.ReactElement {
         </div>
       </section>
 
+      {/* Creation Tools Section */}
+      <section className="py-16 px-6 bg-white">
+        <div className="container max-w-5xl">
+          <div className="text-center mb-10">
+            <p className="text-sm text-[#888] mb-3">More ways to create</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a1a]">Specialized Tools</h2>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <a href="/wikipedia" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 hover:shadow-xl hover:border-emerald-300 transition-all">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shrink-0">
+                  <BookOpen className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-[#1a1a1a] mb-2 group-hover:text-emerald-700 transition-colors">Wikipedia History</h3>
+                  <p className="text-[#666] text-sm leading-relaxed mb-3">
+                    Create documentaries from historical events. Browse "On This Day" events, search Wikipedia articles, and generate videos with media from Commons.
+                  </p>
+                  <div className="flex items-center gap-2 text-emerald-600 text-sm font-medium">
+                    Explore History <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </a>
+            
+            <a href="/inshorts" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 p-6 hover:shadow-xl hover:border-pink-300 transition-all">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Smartphone className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-[#1a1a1a] mb-2 group-hover:text-pink-700 transition-colors">Inshorts</h3>
+                  <p className="text-[#666] text-sm leading-relaxed mb-3">
+                    Create viral shorts from YouTube videos. Extract the most engaging moments and transform them into vertical short-form content.
+                  </p>
+                  <div className="flex items-center gap-2 text-pink-600 text-sm font-medium">
+                    Create Shorts <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Marquee Text Section */}
       <section className="py-8 overflow-hidden bg-[#fafafa] border-y border-[#e5e5e5]">
         <div className="marquee-row mb-4">
@@ -191,10 +237,10 @@ export default function Home(): React.ReactElement {
                 <span className="marquee-dot text-red-500">●</span>
                 <span className="marquee-text-outline">SHORTS</span>
                 <span className="marquee-dot text-red-500">●</span>
-                <span className="marquee-text-outline">MUSIC</span>
-                <span className="marquee-dot text-red-500">●</span>
-                <span className="marquee-text-outline">DIALOGUE</span>
-                <span className="marquee-dot text-red-500">●</span>
+                <span className="marquee-text-outline">WIKIPEDIA</span>
+                <span className="marquee-dot text-emerald-500">●</span>
+                <span className="marquee-text-outline">INSHORTS</span>
+                <span className="marquee-dot text-pink-500">●</span>
                 <span className="marquee-text-outline">EXPORT</span>
                 <span className="marquee-dot text-red-500">●</span>
               </div>

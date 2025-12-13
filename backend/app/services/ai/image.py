@@ -325,48 +325,43 @@ MANDATORY REQUIREMENTS:
         
         lang_output = f"\nGenerate prompts in {lang_name} language." if prompt_language != "en" else ""
         
-        prompt = f"""Create {num_images} {img_style['name'].upper()} scene image prompts for a {video_style.upper()} video.
-{lang_note}
+        prompt = f"""Create {num_images} {img_style['name'].upper()} image prompts for a {video_style.upper()} video.
 
-VIDEO STYLE: {video_style.upper()}
-- Scene type: {style_config['scene']}
-- Mood: {style_config['mood']}
-- Visual style: {style_config['style']}
+TOPIC & CONTENT:
+{script_text[:2500]}
 
-IMAGE STYLE: {img_style['name']}
-- {img_style['prompt']}
-
-ASPECT RATIO: {ratio_config['name']}
-
-CHARACTER DESCRIPTIONS (USE EXACTLY IN ALL PROMPTS):
+CHARACTER DESCRIPTIONS (USE EXACTLY):
 {char_desc}
 
 SETTING: {setting_desc}
 {existing_context}
-SCRIPT ({total_duration}s total):
-{script_text[:2000]}
+
+YOUR TASK:
+1. Read each segment carefully
+2. Create an image that VISUALLY REPRESENTS what is being said
+3. Each image must show the EXACT scene/action/concept described
+
+MATCHING EXAMPLES:
+- Segment about "the lion hunted a deer" → image of lion chasing deer
+- Segment about "scientists discovered a cure" → image of scientists in lab with breakthrough moment
+- Segment about "the city was destroyed" → image of destroyed cityscape
 
 {style_instruction}
 {lang_output}
-CRITICAL RULES:
-1. {ratio_config['prompt']}
-2. {img_style['name'].upper()} style - {img_style['rules'].split(chr(10))[0]}
-3. Use EXACT character descriptions above in EVERY prompt
-4. SAME appearance for each character across ALL images
-5. SAME setting/location in all images
-6. GENEROUS SPACING between characters
-7. Character names from script (may be in {language}) should be used as-is
-{"8. MATCH the style of existing prompts exactly" if existing_prompts else ""}
 
-Create {num_images} prompts showing these EXACT characters in different {style_config['scene']} scenes.
+RULES:
+1. {ratio_config['prompt']}, {img_style['name']} style
+2. Each image MUST match its segment content exactly
+3. Use EXACT character descriptions in every prompt
+4. GENEROUS SPACING between elements
 
 OUTPUT FORMAT (JSON):
 [
-  {{"timestamp": 0, "prompt": "{ratio_config['name']}, {img_style['name']}, {style_config['mood']}, [EXACT CHARACTER DESCRIPTIONS], [SETTING], characters well-spaced"}},
+  {{"timestamp": 0, "prompt": "[What segment describes] in {img_style['name']} style, [character details], {ratio_config['name']}"}},
   ...
 ]
 
-Return ONLY valid JSON array:"""
+Return ONLY valid JSON array with {num_images} prompts:"""
 
         result = await self._generate(prompt, max_tokens=8192)
         

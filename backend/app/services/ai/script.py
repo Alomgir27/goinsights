@@ -80,7 +80,7 @@ ADDITIONAL RULES:
 - Exactly {num_segments} segments
 - Output language: {language.upper()}
 - Spread timestamps across the full video chronologically
-- Each narration: 15-25 words, natural speech
+- Each narration: 5-25 words, natural speech
 
 TRANSCRIPT WITH TIMESTAMPS:
 {key_points[:12000]}
@@ -117,7 +117,7 @@ RULES:
 - source_start MUST be an actual timestamp [Xs] from the transcript
 - Narration describes what's discussed at that timestamp
 - Timestamps between {start_time}s and {end_time}s only
-- {segments_in_batch} segments, 15-25 words each in {language.upper()}
+- {segments_in_batch} segments, 5-25 words each in {language.upper()}
 - Batch {batch + 1}/{num_batches}
 
 TRANSCRIPT SECTION:
@@ -253,7 +253,7 @@ Return ONLY JSON:"""
             media_info.append(f"{i+1}. [{media_type.upper()}] {title} | {desc}")
         media_list = "\n".join(media_info) if media_info else "No media available"
         
-        prompt = f"""Create {num_segments} segments for a {duration_seconds}s documentary in {language}.
+        prompt = f"""Create {num_segments} CAPTIVATING segments for a {duration_seconds}s documentary in {language}.
 
 TOPIC:
 {article_content[:4000]}
@@ -261,29 +261,33 @@ TOPIC:
 MEDIA LIBRARY ({media_count} items):
 {media_list}
 
-YOUR TASK:
-1. Write narration for each segment (25-45 words)
-2. For EACH segment, pick the BEST matching media by analyzing:
-   - What the segment talks about (people, places, events, objects)
-   - What the media shows (from title and description)
-   - Semantic match: war text → battle media, leader mention → portrait media
+WRITING STYLE:
+- Write like a PREMIUM documentary narrator (Discovery, National Geographic style)
+- Use POWERFUL, VIVID vocabulary that creates mental images
+- Start with a HOOK that grabs attention instantly
+- Build TENSION and CURIOSITY throughout
+- Each sentence should feel VALUABLE and MEMORABLE
+- Use dramatic pauses, rhetorical questions, surprising facts
+- Make viewers feel they're learning something EXTRAORDINARY
 
-MATCHING EXAMPLES:
-- Segment about "soldiers attacked the city" → pick media showing battle/military
-- Segment about "the president announced" → pick media showing the leader/speech
-- Segment about "aftermath destruction" → pick media showing ruins/damage
-- Segment about "map of the region" → pick media showing map/geography
+YOUR TASK:
+1. Write COMPELLING narration (5-25 words per segment)
+2. Match media based on SEMANTIC RELEVANCE
+
+MEDIA COUNT (Min 1, Max 5):
+- Short segment: 1 media
+- Medium segment: 1-2 media
+- Long segment: 2-3 media
 
 OUTPUT FORMAT:
 [
-  {{"text": "narration text...", "media_index": N, "type": "hook|background|incident|aftermath|conclusion", "duration": 7}}
+  {{"text": "narration...", "media_indices": [2], "type": "hook|background|incident|conclusion", "duration": 7}}
 ]
 
 RULES:
 - {language.upper()} language, convert years to words
-- media_index must be 1-{media_count}
-- Pick media that VISUALLY matches what the narration describes
-- Same media CAN be reused if it fits multiple segments
+- Use IMPACTFUL words: "extraordinary", "devastating", "remarkable", "pivotal"
+- Create EMOTIONAL CONNECTION with the story
 
 Return JSON array only:"""
 
@@ -302,14 +306,21 @@ Return JSON array only:"""
                 current_time = 0
                 for s in raw_segments:
                     dur = s.get("duration", 7)
-                    media_idx = s.get("media_index") or s.get("image_index", 0)
-                    media_id = None
-                    media_type = "image"
                     
-                    if 0 < media_idx <= len(images):
-                        media = images[media_idx - 1]
-                        media_id = media.get("id")
-                        media_type = media.get("type", "image")
+                    # Support both media_indices (array) and legacy media_index (single)
+                    raw_indices = s.get("media_indices") or []
+                    if not raw_indices:
+                        legacy = s.get("media_index") or s.get("image_index")
+                        raw_indices = [legacy] if legacy else []
+                    
+                    media_ids = []
+                    media_type = "image"
+                    for idx in raw_indices:
+                        if idx and 0 < idx <= len(images):
+                            media = images[idx - 1]
+                            media_ids.append(media.get("id"))
+                            if media.get("type") == "video":
+                                media_type = "video"
                     
                     segments.append({
                         "text": s.get("text", ""),
@@ -317,7 +328,7 @@ Return JSON array only:"""
                         "end": current_time + dur,
                         "duration": dur,
                         "type": s.get("type", "content"),
-                        "media_id": media_id,
+                        "media_ids": media_ids,
                         "media_type": media_type,
                         "voice_id": "aria"
                     })
@@ -358,7 +369,7 @@ SEGMENTS NEEDED: {segments_in_batch}
 
 DIALOGUE FORMAT:
 - 2 speakers: Learner (curious, asks questions) and Expert (explains clearly)
-- Each segment 20-50 words, 5-10 seconds spoken
+- Each segment 5-25 words, 3-8 seconds spoken
 - Alternate speakers naturally
 - Use names Nina and Leo consistently
 
@@ -409,7 +420,8 @@ Return ONLY valid JSON array:"""
         seg_info = []
         for i, s in enumerate(segments):
             text = s.get("text", "")[:100]
-            seg_info.append(f"{i+1}. \"{text}\"")
+            dur = s.get("duration", 7)
+            seg_info.append(f"{i+1}. ({dur}s) \"{text}\"")
         
         media_info = []
         for i, m in enumerate(media_list):
@@ -417,7 +429,7 @@ Return ONLY valid JSON array:"""
             desc = m.get("description", "")[:120]
             media_info.append(f"{i+1}. [{m.get('type', 'image').upper()}] {title}: {desc}")
         
-        prompt = f"""Match each segment to the BEST fitting media based on content.
+        prompt = f"""Match each segment to media based on SEMANTIC RELEVANCE.
 
 SEGMENTS ({len(segments)}):
 {chr(10).join(seg_info)}
@@ -425,26 +437,39 @@ SEGMENTS ({len(segments)}):
 MEDIA ({len(media_list)} items):
 {chr(10).join(media_info)}
 
-For each segment, return the media index (1-{len(media_list)}) that BEST matches the segment content.
-Match by: people mentioned, places, events, objects, actions described.
+MATCHING RULES:
+- Read segment text and find media whose description MATCHES the content
+- Min 1, Max 5 media per segment
+- Short (5-6s): 1 media | Medium (7-9s): 1-2 | Long (10s+): 2-3
+- ONLY pick media if description relates to segment
 
-Return JSON array of {len(segments)} numbers (media indices):
-[3, 1, 5, 2, ...]
+Return JSON array of arrays (media indices per segment):
+[[2], [1, 5], [3], [4, 2, 6], ...]
 
 Return ONLY the JSON array:"""
 
         result = await self._generate(prompt, max_tokens=4096)
+        print(f"[SMART-MATCH] AI result: {result[:500]}...")
         
         try:
-            json_match = re.search(r'\[[\s\S]*?\]', result)
+            json_match = re.search(r'\[\s*\[[\s\S]*\]\s*\]', result)
+            print(f"[SMART-MATCH] Regex match: {json_match.group()[:200] if json_match else 'None'}")
             if json_match:
-                indices = json.loads(json_match.group())
+                assignments = json.loads(json_match.group())
+                print(f"[SMART-MATCH] Parsed {len(assignments)} assignments")
                 for i, seg in enumerate(segments):
-                    if i < len(indices):
-                        idx = indices[i]
-                        if 0 < idx <= len(media_list):
-                            seg["media_id"] = media_list[idx - 1].get("id")
-                            seg["media_type"] = media_list[idx - 1].get("type", "image")
+                    if i < len(assignments):
+                        indices = assignments[i] if isinstance(assignments[i], list) else [assignments[i]]
+                        media_ids = []
+                        media_type = "image"
+                        for idx in indices:
+                            if idx and 0 < idx <= len(media_list):
+                                media_ids.append(media_list[idx - 1].get("id"))
+                                if media_list[idx - 1].get("type") == "video":
+                                    media_type = "video"
+                        if media_ids:
+                            seg["media_ids"] = media_ids
+                            seg["media_type"] = media_type
         except Exception as e:
             print(f"Reassign media error: {e}")
         

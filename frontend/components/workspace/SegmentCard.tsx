@@ -15,7 +15,7 @@ interface SegmentCardProps {
   extractingIndex: number | null;
   previewClip: number | null;
   projectId: string;
-  onUpdate: (field: string, value: string | number) => void;
+  onUpdate: (field: string, value: string | number | string[]) => void;
   onGenerateAudio: () => void;
   onExtractClip: () => void;
   onRemove: () => void;
@@ -29,14 +29,14 @@ interface SegmentCardProps {
   previewClipUrl: string;
   previewAudioUrl: string;
   mediaAssets?: MediaAsset[];
-  onAssignMedia?: (mediaId: string | null) => void;
+  onToggleMedia?: (mediaId: string) => void;
 }
 
 export default function SegmentCard({
   segment, index, voices, projectType, videoDownloaded, generatingIndex, extractingIndex,
   previewClip, projectId, onUpdate, onGenerateAudio, onExtractClip, onRemove,
   onMoveUp, onMoveDown, onPreviewToggle, onAddAfter, canMoveUp, canMoveDown, canRemove,
-  previewClipUrl, previewAudioUrl, mediaAssets, onAssignMedia
+  previewClipUrl, previewAudioUrl, mediaAssets, onToggleMedia
 }: SegmentCardProps) {
   const isGenerating = generatingIndex === index;
   const isExtracting = extractingIndex === index;
@@ -109,13 +109,19 @@ export default function SegmentCard({
               </div>
               {mediaAssets && mediaAssets.length > 0 && (
                 <>
-                  <select value={segment.mediaId || ""} onChange={(e) => onAssignMedia?.(e.target.value || null)}
-                    className="text-[10px] px-2 py-1 border border-slate-200 rounded bg-white shrink-0">
-                    <option value="">🖼️ --</option>
-                    {mediaAssets.map((m, i) => (
-                      <option key={m.id} value={m.id}>{m.type === "image" ? "🖼️" : "🎬"} #{i + 1}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-0.5 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                    {mediaAssets.map((m, i) => {
+                      const isSelected = segment.mediaIds?.includes(m.id);
+                      return (
+                        <button key={m.id} onClick={() => onToggleMedia?.(m.id)} title={`${m.type === "image" ? "Image" : "Video"} #${i + 1}`}
+                          className={`w-5 h-5 text-[9px] font-medium rounded transition-all ${
+                            isSelected ? "bg-purple-500 text-white" : "bg-white text-slate-500 hover:bg-purple-100"
+                          }`}>
+                          {i + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <select value={segment.effect || "none"} onChange={(e) => onUpdate("effect", e.target.value)}
                     className="text-[10px] px-2 py-1 border border-blue-200 rounded bg-blue-50 shrink-0">
                     <option value="none">✨ None</option>

@@ -156,7 +156,7 @@ export const video = {
   downloadMusic: (projectId: string, videoId: string) => api.post("/video/download-music", { project_id: projectId, video_id: videoId }),
   generateMusic: (projectId: string, presetId: string) => api.post("/video/generate-music", { project_id: projectId, preset_id: presetId }),
   musicPreview: (presetId: string) => `${api.defaults.baseURL}/video/music-preview/${presetId}`,
-  createFromMedia: (projectId: string, mediaTimeline: any[], options: { subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; subtitleSize: number; subtitlePosition?: string; dialogueMode?: boolean; speaker1Position?: string; speaker2Position?: string; dialogueBgStyle?: string; resize: string; bgMusic?: boolean; bgMusicVolume?: number }) =>
+  createFromMedia: (projectId: string, mediaTimeline: any[], options: { subtitles: boolean; animatedSubtitles: boolean; subtitleStyle: string; subtitleSize: number; subtitlePosition?: string; dialogueMode?: boolean; speaker1Position?: string; speaker2Position?: string; dialogueBgStyle?: string; resize: string; bgMusic?: boolean; bgMusicVolume?: number; watermark?: { enabled: boolean; text: string; position: string; fontSize: number; opacity: number } }) =>
     api.post("/video/create-with-bubbles", { 
       project_id: projectId, 
       bubble_positions: [], 
@@ -172,7 +172,8 @@ export const video = {
       speaker2_position: options.speaker2Position || "top-right",
       dialogue_bg_style: options.dialogueBgStyle || "transparent",
       bg_music: options.bgMusic || false,
-      bg_music_volume: options.bgMusicVolume || 0.3
+      bg_music_volume: options.bgMusicVolume || 0.3,
+      watermark: options.watermark ? { enabled: options.watermark.enabled, text: options.watermark.text, position: options.watermark.position, font_size: options.watermark.fontSize, opacity: options.watermark.opacity } : { enabled: false, text: "", position: "bottom-right", font_size: 28, opacity: 0.7 }
     })
 };
 
@@ -212,6 +213,32 @@ export const script = {
     api.post("/script/generate-wiki", { project_id: projectId, duration_seconds: duration, language }),
   reassignMedia: (projectId: string) =>
     api.post("/script/reassign-media", { project_id: projectId })
+};
+
+export const inshorts = {
+  create: (url: string) => api.post("/inshorts/create", { url }),
+  search: (query: string, maxResults: number = 15) => 
+    api.post("/inshorts/search", { query, max_results: maxResults }),
+  get: (id: string) => api.get(`/inshorts/${id}`),
+  analyze: (id: string, minDuration: number = 15, maxDuration: number = 90) =>
+    api.post(`/inshorts/${id}/analyze`, { min_duration: minDuration, max_duration: maxDuration }),
+  select: (id: string, start: number, end: number) =>
+    api.post(`/inshorts/${id}/select`, { start, end }),
+  effects: (id: string, effects: any) =>
+    api.post(`/inshorts/${id}/effects`, effects),
+  generate: (id: string, data: { segment_start: number; segment_end: number; effects: any; options: any }) =>
+    api.post(`/inshorts/${id}/generate`, data),
+  status: (id: string) => api.get(`/inshorts/${id}/status`),
+  videoUrl: (id: string) => `${api.defaults.baseURL}/inshorts/${id}/video`,
+  batchSuggest: (id: string, count: number = 5, minDuration: number = 15, maxDuration: number = 60) =>
+    api.post(`/inshorts/${id}/batch/suggest`, { count, min_duration: minDuration, max_duration: maxDuration }),
+  batchGet: (id: string) => api.get(`/inshorts/${id}/batch`),
+  batchUpdate: (id: string, shorts: any[]) => api.put(`/inshorts/${id}/batch`, { shorts }),
+  batchGenerate: (id: string, shortIds: string[], defaultEffects: any, options: any) =>
+    api.post(`/inshorts/${id}/batch/generate`, { short_ids: shortIds, default_effects: defaultEffects, options }),
+  batchVideoUrl: (id: string, shortId: string) => `${api.defaults.baseURL}/inshorts/${id}/batch/${shortId}/video`,
+  batchUpload: (id: string, data: { short_id: string; title: string; description: string; tags: string; access_token: string; privacy: string }) =>
+    api.post(`/inshorts/${id}/batch/upload`, data)
 };
 
 export default api;

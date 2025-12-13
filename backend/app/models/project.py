@@ -11,7 +11,7 @@ class Project(Base):
     __tablename__ = "projects"
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    project_type = Column(String, default="youtube")  # "youtube" | "custom"
+    project_type = Column(String, default="youtube")  # "youtube" | "custom" | "inshorts"
     
     # YouTube project fields
     youtube_url = Column(String, nullable=True)
@@ -40,6 +40,13 @@ class Project(Base):
     script = Column(Text)
     segments_data = Column(JSON)  # Segments with voice_id, media_id, duration, trim
     wiki_data = Column(JSON)  # Wikipedia article data for wiki projects
+    
+    # Inshorts-specific fields
+    inshorts_segments = Column(JSON)  # AI-suggested segments [{start, end, score, reason}]
+    inshorts_selected = Column(JSON)  # Selected segment {start, end}
+    inshorts_effects = Column(JSON)  # Applied effects {blur, zoom, shake, vignette, speed}
+    inshorts_options = Column(JSON)  # Options {subtitles, keepAudio, aspectRatio}
+    inshorts_batch = Column(JSON)  # Batch shorts [{id, start, end, effects, title, description, tags, status, video_path}]
     
     status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)

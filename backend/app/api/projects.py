@@ -141,12 +141,13 @@ async def save_segments(project_id: str, data: dict, db: AsyncSession = Depends(
             "source_start": s.get("sourceStart", 0),
             "source_end": s.get("sourceEnd", 0),
             "voice_id": s.get("voiceId", s.get("voice_id", "aria")),
-            "media_id": s.get("mediaId", s.get("media_id")),
+            "media_ids": s.get("mediaIds", s.get("media_ids", [])),
             "media_type": s.get("mediaType", s.get("media_type")),
             "duration": s.get("duration", 8),
             "trim_start": s.get("trimStart", s.get("trim_start", 0)),
             "trim_end": s.get("trimEnd", s.get("trim_end")),
             "effect": s.get("effect", "none"),
+            "silence": s.get("silence", 0),
             "audio_generated": s.get("audioGenerated", s.get("audio_generated", False)),
         }
         for s in segments

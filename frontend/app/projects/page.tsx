@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Trash2, ArrowRight, Folder, Plus, Clock, Youtube, Sparkles, ArrowLeft } from "lucide-react";
+import { Trash2, ArrowRight, Folder, Plus, Clock, Youtube, Sparkles, ArrowLeft, Smartphone } from "lucide-react";
 import { projects } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -94,7 +94,7 @@ export default function ProjectsPage(): React.ReactElement {
                   )}
                   {/* Hover overlay */}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Link href={`/workspace/${p.id}`} className="bg-white text-[#1a1a1a] px-4 py-2 rounded-lg text-sm font-semibold">
+                    <Link href={p.project_type === "inshorts" ? `/inshorts/${p.id}` : `/workspace/${p.id}`} className="bg-white text-[#1a1a1a] px-4 py-2 rounded-lg text-sm font-semibold">
                       Open Project
                     </Link>
                   </div>
@@ -108,8 +108,8 @@ export default function ProjectsPage(): React.ReactElement {
                       <span className={`text-xs font-medium px-2 py-1 rounded flex items-center gap-1 ${
                         p.status === "completed" ? "bg-green-50 text-green-600" : "bg-[#f5f5f5] text-[#666]"
                       }`}>
-                        {p.project_type === "custom" ? <Sparkles className="w-3 h-3" /> : <Youtube className="w-3 h-3" />}
-                        {p.status}
+                        {p.project_type === "inshorts" ? <Smartphone className="w-3 h-3" /> : p.project_type === "custom" ? <Sparkles className="w-3 h-3" /> : <Youtube className="w-3 h-3" />}
+                        {p.project_type === "inshorts" ? "Short" : p.status}
                       </span>
                       <span className="text-xs text-[#999] flex items-center gap-1">
                         <Clock className="w-3 h-3" /> {formatDate(p.created_at)}

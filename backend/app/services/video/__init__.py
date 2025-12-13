@@ -14,10 +14,11 @@ class VideoService(ClipService):
     def image_to_video_with_effect(self, image_path: str, output_path: str, duration: float, effect: str = "none", resize: str = "16:9") -> str:
         return image_to_video_with_effect(image_path, output_path, duration, effect, resize)
     
-    def merge_clips_final(self, project_id: str, clip_paths: list, audio_path: str, subtitle_path: str, resize: str, bg_music_path: str = None, bg_music_volume: float = 0.3, animated_subtitles: bool = True, subtitle_style: str = "karaoke", subtitle_size: int = 72, subtitle_position: str = "bottom") -> str:
+    def merge_clips_final(self, project_id: str, clip_paths: list, audio_path: str, subtitle_path: str, resize: str, bg_music_path: str = None, bg_music_volume: float = 0.3, animated_subtitles: bool = True, subtitle_style: str = "karaoke", subtitle_size: int = 72, subtitle_position: str = "bottom", watermark_text: str = "", watermark_position: str = "bottom-right", watermark_font_size: int = 28, watermark_opacity: float = 0.7) -> str:
         return merge_clips_final(
             self.storage, project_id, clip_paths, audio_path, subtitle_path, resize,
-            bg_music_path, bg_music_volume, animated_subtitles, subtitle_style, subtitle_size, subtitle_position
+            bg_music_path, bg_music_volume, animated_subtitles, subtitle_style, subtitle_size, subtitle_position,
+            watermark_text, watermark_position, watermark_font_size, watermark_opacity
         )
     
     def create_video_from_media(self, project_id: str, segments: list, audio_path: str, resize: str = "16:9") -> str:
@@ -58,7 +59,11 @@ class VideoService(ClipService):
         speaker2_position: str = "top-right",
         dialogue_bg_style: str = "transparent",
         bg_music_path: str = None,
-        bg_music_volume: float = 0.3
+        bg_music_volume: float = 0.3,
+        watermark_text: str = "",
+        watermark_position: str = "bottom-right",
+        watermark_font_size: int = 28,
+        watermark_opacity: float = 0.7
     ) -> str:
         project_dir = self.storage / project_id
         
@@ -90,36 +95,39 @@ class VideoService(ClipService):
         accumulated_time = 0
         
         print(f"[VIDEO] Processing {len(segments)} segments with {len(media_assets)} media assets")
-        print(f"[VIDEO] Media IDs available: {list(media_by_id.keys())}")
-        print(f"[VIDEO] Default media: {default_media.get('id') if default_media else 'None'}")
         
         for idx, seg in enumerate(segments):
-            media_id = seg.get("media_id") or seg.get("mediaId")
-            media = media_by_id.get(media_id) if media_id else default_media
+            media_ids = seg.get("media_ids") or []
+            if not media_ids and seg.get("media_id"):
+                media_ids = [seg.get("media_id")]
             
-            # Calculate segment duration from start/end or duration field
             seg_start = seg.get("start", accumulated_time)
             seg_end = seg.get("end", seg_start + 5)
-            seg_duration = max(seg_end - seg_start, seg.get("duration", 5), 0.5)
+            silence = seg.get("silence", 0)
+            seg_duration = max(seg_end - seg_start, seg.get("duration", 5), 0.5) + silence
+            effect = seg.get("effect") or "none"
             
-            effect = seg.get("effect") or seg.get("Effect") or "none"
-            current_media_id = media.get("id") if media else None
-            media_type = media.get("type") or media.get("media_type", "image") if media else "unknown"
-            
-            print(f"[Seg {idx}] saved_media_id={media_id}, using={current_media_id}, type={media_type}, dur={seg_duration:.1f}s")
-            
-            # Check if we should extend previous group (same media)
-            if groups and groups[-1]["media_id"] == current_media_id:
-                groups[-1]["duration"] += seg_duration
-                groups[-1]["seg_indices"].append(idx)
+            if not media_ids:
+                media = default_media
+                media_id = media.get("id") if media else None
+                print(f"[Seg {idx}] no media, using default={media_id}, dur={seg_duration:.1f}s")
+                if groups and groups[-1]["media_id"] == media_id:
+                    groups[-1]["duration"] += seg_duration
+                    groups[-1]["seg_indices"].append(idx)
+                else:
+                    groups.append({"media_id": media_id, "media": media, "duration": seg_duration, "effect": effect, "seg_indices": [idx]})
             else:
-                groups.append({
-                    "media_id": current_media_id,
-                    "media": media,
-                    "duration": seg_duration,
-                    "effect": effect,
-                    "seg_indices": [idx]
-                })
+                per_media_duration = seg_duration / len(media_ids)
+                print(f"[Seg {idx}] {len(media_ids)} media, dur={seg_duration:.1f}s, per_media={per_media_duration:.1f}s")
+                for mid in media_ids:
+                    media = media_by_id.get(mid)
+                    if not media:
+                        continue
+                    if groups and groups[-1]["media_id"] == mid:
+                        groups[-1]["duration"] += per_media_duration
+                        groups[-1]["seg_indices"].append(idx)
+                    else:
+                        groups.append({"media_id": mid, "media": media, "duration": per_media_duration, "effect": effect, "seg_indices": [idx]})
             
             accumulated_time += seg_duration
         
@@ -175,7 +183,8 @@ class VideoService(ClipService):
         
         return self.merge_clips_final(
             project_id, temp_clips, audio_path, subtitle_path, resize,
-            bg_music_path, bg_music_volume, animated_subtitles, subtitle_style, subtitle_size, subtitle_position
+            bg_music_path, bg_music_volume, animated_subtitles, subtitle_style, subtitle_size, subtitle_position,
+            watermark_text, watermark_position, watermark_font_size, watermark_opacity
         )
 
 

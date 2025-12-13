@@ -114,15 +114,6 @@ export default function Workspace(): React.ReactElement {
     }
   };
 
-  const handleSmartMatchMedia = async () => {
-    if (!ws.project?.id) return;
-    ws.setProcessing("smart-match");
-    try {
-      await script.reassignMedia(ws.project.id);
-      await ws.loadProject();
-    } catch {}
-    ws.setProcessing("");
-  };
   
   if (!ws.project) {
     return (
@@ -340,6 +331,7 @@ export default function Workspace(): React.ReactElement {
                   processing={ws.processing}
                   onSegmentUpdate={ws.handleUpdateSegment}
                   onBatchUpdateSegments={ws.handleBatchUpdateSegments}
+                  onToggleMedia={ws.handleToggleMedia}
                   onAddSegment={(pos) => ws.handleAddSegment(pos, currentTime, selectedVoice)}
                   onRemoveSegment={ws.handleRemoveSegment}
                   onMoveSegment={ws.handleMoveSegment}
@@ -354,7 +346,6 @@ export default function Workspace(): React.ReactElement {
                   onApplyVoiceToAll={ws.handleApplyVoiceToAll}
                   onApplySilenceToAll={ws.handleApplySilenceToAll}
                   onSaveNow={ws.saveSegmentsNow}
-                  onSmartMatchMedia={handleSmartMatchMedia}
                 />
                 <button onClick={() => handleStepChange("options")} disabled={!ws.allAudioGenerated || (ws.projectType === "youtube" && !ws.allClipsExtracted)}
                   className="btn-primary w-full disabled:opacity-50">

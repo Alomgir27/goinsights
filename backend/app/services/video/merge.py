@@ -4,6 +4,22 @@ from pathlib import Path
 from .subtitles import create_animated_subtitles
 
 
+def get_watermark_position(position: str, resize: str) -> str:
+    """Return FFmpeg drawtext x:y position based on position name."""
+    scale_map = {"16:9": (1920, 1080), "9:16": (1080, 1920), "1:1": (1080, 1080)}
+    w, h = scale_map.get(resize, (1920, 1080))
+    margin = 30
+    positions = {
+        "top-left": f"x={margin}:y={margin}",
+        "top-center": f"x=(w-text_w)/2:y={margin}",
+        "top-right": f"x=w-text_w-{margin}:y={margin}",
+        "bottom-left": f"x={margin}:y=h-text_h-{margin}",
+        "bottom-center": f"x=(w-text_w)/2:y=h-text_h-{margin}",
+        "bottom-right": f"x=w-text_w-{margin}:y=h-text_h-{margin}",
+    }
+    return positions.get(position, positions["bottom-right"])
+
+
 def merge_clips_final(
     storage: Path,
     project_id: str,
@@ -16,7 +32,11 @@ def merge_clips_final(
     animated_subtitles: bool = True,
     subtitle_style: str = "karaoke",
     subtitle_size: int = 72,
-    subtitle_position: str = "bottom"
+    subtitle_position: str = "bottom",
+    watermark_text: str = "",
+    watermark_position: str = "bottom-right",
+    watermark_font_size: int = 28,
+    watermark_opacity: float = 0.7
 ) -> str:
     project_dir = storage / project_id
     concat_file = project_dir / "concat.txt"
@@ -27,7 +47,7 @@ def merge_clips_final(
     if not valid_clips:
         raise Exception("No valid clips to merge")
     
-    print(f"[MERGE] {len(valid_clips)} clips, audio={os.path.exists(audio_path) if audio_path else False}")
+    print(f"[MERGE] {len(valid_clips)} clips, audio={os.path.exists(audio_path) if audio_path else False}, bgMusic={bg_music_path is not None}, vol={bg_music_volume}")
     
     with open(concat_file, "w") as f:
         for path in valid_clips:
@@ -51,6 +71,12 @@ def merge_clips_final(
                 vf_filters.append(f"subtitles='{sub_path}'")
         else:
             vf_filters.append(f"subtitles='{sub_path}'")
+    
+    if watermark_text:
+        escaped_text = watermark_text.replace("'", "\\'").replace(":", "\\:")
+        pos_coords = get_watermark_position(watermark_position, resize)
+        alpha = min(max(watermark_opacity, 0.3), 1.0)
+        vf_filters.append(f"drawtext=text='{escaped_text}':{pos_coords}:fontsize={watermark_font_size}:fontcolor=white@{alpha}:shadowcolor=black@0.5:shadowx=2:shadowy=2")
     
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file)]
     
@@ -76,7 +102,6 @@ def merge_clips_final(
         "-r", "25",
         "-vsync", "cfr",
         "-threads", "0",
-        "-shortest",
         output
     ])
     

@@ -1,44 +1,5 @@
 import { create } from "zustand";
-
-interface Clip {
-  start: number;
-  end: number;
-  path?: string;
-}
-
-interface TranscriptItem {
-  start: number;
-  duration: number;
-  text: string;
-}
-
-interface SegmentData {
-  text: string;
-  start: number;
-  end: number;
-  source_start: number;
-  source_end: number;
-}
-
-interface Project {
-  id: string;
-  project_type?: "youtube" | "custom" | "ads" | "wikipedia";
-  video_style?: string;
-  language?: string;
-  videoId?: string;
-  title: string;
-  thumbnail?: string;
-  duration: number;
-  transcript?: TranscriptItem[];
-  summary?: string;
-  script?: string;
-  prompt?: string;
-  segments_data?: SegmentData[];
-  wiki_data?: { article_title?: string; extract?: string; sections?: any[] };
-  clips: Clip[];
-  status: string;
-  animatedSubtitles?: boolean;
-}
+import type { Project, Clip } from "./types";
 
 interface AppStore {
   project: Project | null;

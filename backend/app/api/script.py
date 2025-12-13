@@ -95,6 +95,7 @@ class ReassignMediaRequest(BaseModel):
 
 @router.post("/reassign-media")
 async def reassign_media_to_segments(request: ReassignMediaRequest, db: AsyncSession = Depends(get_db)):
+    print(f"[SMART-MATCH] Starting for project {request.project_id}")
     project = await db.get(Project, request.project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -110,16 +111,20 @@ async def reassign_media_to_segments(request: ReassignMediaRequest, db: AsyncSes
     if not assets:
         raise HTTPException(status_code=400, detail="No media found")
     
-    media_list = [{"id": a.id, "title": a.original_filename or "", "description": a.prompt or "", "type": a.media_type or "image"} for a in assets]
+    media_list = [{"id": a.id, "title": a.original_filename or a.prompt or "", "description": a.prompt or "", "type": a.media_type or "image"} for a in assets]
+    print(f"[SMART-MATCH] {len(segments)} segments, {len(media_list)} media")
     
     from app.services.ai import GeminiService
     service = GeminiService()
     
     updated = await service.reassign_media_to_segments(segments, media_list)
     
+    assigned_count = sum(1 for s in updated if s.get("media_ids"))
+    print(f"[SMART-MATCH] Assigned media to {assigned_count}/{len(updated)} segments")
+    
     project.segments_data = updated
     flag_modified(project, "segments_data")
     await db.commit()
     
-    return {"status": "updated", "segments": len(updated)}
+    return {"status": "updated", "segments": len(updated), "assigned": assigned_count}
 

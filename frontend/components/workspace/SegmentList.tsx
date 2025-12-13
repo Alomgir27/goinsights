@@ -6,6 +6,7 @@ import SegmentCard from "./SegmentCard";
 import MediaManager from "./MediaManager";
 import type { Segment, Voice, MediaAsset } from "@/lib/types";
 import { voice, video } from "@/lib/api";
+import { EFFECTS } from "@/lib/constants";
 
 interface SegmentListProps {
   projectId: string;
@@ -22,8 +23,9 @@ interface SegmentListProps {
   script?: string;
   saving: boolean;
   lastSaved: Date | null;
-  onSegmentUpdate: (index: number, field: string, value: string | number) => void;
-  onBatchUpdateSegments: (updates: Array<{ index: number; field: string; value: string | number }>) => void;
+  onSegmentUpdate: (index: number, field: string, value: string | number | string[]) => void;
+  onBatchUpdateSegments: (updates: Array<{ index: number; field: string; value: string | number | string[] }>) => void;
+  onToggleMedia: (index: number, mediaId: string) => void;
   onAddSegment: (position: number) => void;
   onRemoveSegment: (index: number) => void;
   onMoveSegment: (index: number, direction: "up" | "down") => void;
@@ -38,24 +40,15 @@ interface SegmentListProps {
   onApplyVoiceToAll: (voiceId: string) => void;
   onApplySilenceToAll: (mode: "fixed" | "random", value: number, maxValue?: number) => void;
   onSaveNow: () => void;
-  onSmartMatchMedia?: () => void;
   processing: string;
 }
-
-const EFFECTS = [
-  { id: "none", label: "None" },
-  { id: "fade", label: "Fade" },
-  { id: "pop", label: "Pop" },
-  { id: "slide", label: "Slide" },
-  { id: "zoom", label: "Zoom" },
-];
 
 export default function SegmentList({
   projectId, projectType, segments, voices, mediaAssets, selectedVoice, language,
   videoDownloaded, generatingIndex, extractingIndex, previewClip, script,
-  saving, lastSaved, onSegmentUpdate, onBatchUpdateSegments, onAddSegment, onRemoveSegment,
+  saving, lastSaved, onSegmentUpdate, onBatchUpdateSegments, onToggleMedia, onAddSegment, onRemoveSegment,
   onMoveSegment, onGenerateAudio, onExtractClip, onExtractAllClips,
-  onGenerateAll, onPreviewToggle, onMediaChange, onAutoDistributeMedia, onAutoDistributeEffects, onApplyVoiceToAll, onApplySilenceToAll, onSaveNow, onSmartMatchMedia, processing
+  onGenerateAll, onPreviewToggle, onMediaChange, onAutoDistributeMedia, onAutoDistributeEffects, onApplyVoiceToAll, onApplySilenceToAll, onSaveNow, processing
 }: SegmentListProps) {
   const [showScript, setShowScript] = React.useState(false);
   const [selectedEffect, setSelectedEffect] = React.useState("fade");
@@ -178,16 +171,6 @@ export default function SegmentList({
                     <option key={n} value={n}>1:{n}</option>
                   ))}
                 </select>
-                {onSmartMatchMedia && (
-                  <button
-                    onClick={onSmartMatchMedia}
-                    disabled={processing === "smart-match"}
-                    className="py-1 px-2 text-[10px] font-medium bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition-all disabled:opacity-50"
-                    title="AI matches media to segments by content"
-                  >
-                    {processing === "smart-match" ? "⏳ Matching..." : "🧠 Smart Match"}
-                  </button>
-                )}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] text-slate-500">Effects:</span>
@@ -399,7 +382,7 @@ export default function SegmentList({
             previewClipUrl={video.previewClip(projectId, i, seg.timestamp)}
             previewAudioUrl={voice.previewSegment(projectId, i, seg.timestamp)}
             mediaAssets={mediaAssets}
-            onAssignMedia={(mediaId) => onSegmentUpdate(i, "mediaId", mediaId || "")}
+            onToggleMedia={(mediaId) => onToggleMedia(i, mediaId)}
           />
         ))}
       </div>

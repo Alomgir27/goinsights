@@ -129,6 +129,7 @@ async def collect_media(request: CollectMediaRequest, db: AsyncSession = Depends
                     file_path=file_path,
                     media_type=media_type,
                     source="wikipedia",
+                    original_filename=item.get("title", ""),
                     prompt=item.get("description", item.get("title", "")),
                     order=i
                 )

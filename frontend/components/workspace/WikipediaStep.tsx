@@ -55,7 +55,7 @@ export default function WikipediaStep({
         clipExtracted: true,
         timestamp: Date.now(),
         voiceId: s.voice_id || "aria",
-        mediaId: s.media_id,
+        mediaIds: s.media_ids || (s.media_id ? [s.media_id] : []),
         duration: s.duration || 7,
         type: s.type || "content"
       }));

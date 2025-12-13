@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Merge, Music, X } from "lucide-react";
-import type { MergeOptions, MusicPreset } from "@/lib/types";
+import { Merge, Music, X, Type } from "lucide-react";
+import type { MergeOptions, MusicPreset, WatermarkConfig } from "@/lib/types";
 
 interface MergeOptionsStepProps {
   mergeOptions: MergeOptions;
@@ -179,6 +179,80 @@ export default function MergeOptionsStep({
             )}
           </div>
         )}
+
+        <div className="border-t border-slate-200 pt-3 mt-3">
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={mergeOptions.watermark.enabled}
+              onChange={(e) => setMergeOptions(p => ({ ...p, watermark: { ...p.watermark, enabled: e.target.checked } }))}
+              className="w-4 h-4 accent-teal-500"
+            />
+            <Type className="w-4 h-4 text-teal-600" />
+            <span className="text-sm">Add Watermark</span>
+          </label>
+
+          {mergeOptions.watermark.enabled && (
+            <div className="ml-6 space-y-3">
+              <div>
+                <label className="text-xs text-[#666] block mb-1">Text (Channel Name)</label>
+                <input
+                  type="text"
+                  value={mergeOptions.watermark.text}
+                  onChange={(e) => setMergeOptions(p => ({ ...p, watermark: { ...p.watermark, text: e.target.value } }))}
+                  placeholder="@YourChannel"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-teal-400 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-[#666] block mb-2">Position</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "top-left", icon: "↖", label: "Top Left" },
+                    { id: "top-center", icon: "⬆", label: "Top" },
+                    { id: "top-right", icon: "↗", label: "Top Right" },
+                    { id: "bottom-left", icon: "↙", label: "Bottom Left" },
+                    { id: "bottom-center", icon: "⬇", label: "Bottom" },
+                    { id: "bottom-right", icon: "↘", label: "Bottom Right" },
+                  ].map(pos => (
+                    <button
+                      key={pos.id}
+                      onClick={() => setMergeOptions(p => ({ ...p, watermark: { ...p.watermark, position: pos.id as WatermarkConfig["position"] } }))}
+                      className={`p-2 rounded-lg text-center transition-all text-xs ${
+                        mergeOptions.watermark.position === pos.id
+                          ? "bg-teal-100 border-2 border-teal-500"
+                          : "bg-[#f5f5f5] border-2 border-transparent hover:border-teal-200"
+                      }`}
+                    >
+                      <span className="text-base block">{pos.icon}</span>
+                      <span>{pos.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-[#666] block mb-1">Size: {mergeOptions.watermark.fontSize}px</label>
+                  <input
+                    type="range" min={16} max={48} value={mergeOptions.watermark.fontSize}
+                    onChange={(e) => setMergeOptions(p => ({ ...p, watermark: { ...p.watermark, fontSize: parseInt(e.target.value) } }))}
+                    className="w-full accent-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-[#666] block mb-1">Opacity: {Math.round(mergeOptions.watermark.opacity * 100)}%</label>
+                  <input
+                    type="range" min={0.3} max={1} step={0.1} value={mergeOptions.watermark.opacity}
+                    onChange={(e) => setMergeOptions(p => ({ ...p, watermark: { ...p.watermark, opacity: parseFloat(e.target.value) } }))}
+                    className="w-full accent-teal-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div>
           <label className="text-xs text-[#666] block mb-1">Aspect Ratio</label>

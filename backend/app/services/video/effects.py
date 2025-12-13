@@ -115,6 +115,11 @@ def image_to_video_with_effect(image_path: str, output_path: str, duration: floa
             "pop": scale_filter,
             "slide": scale_filter,
             "zoom": f"{scale_filter},zoompan=z='1+on/{frames}*0.1':d={frames}:s={res}",
+            "zoom_out": scale_filter,
+            "pan_left": scale_filter,
+            "pan_right": scale_filter,
+            "shake": scale_filter,
+            "bounce": scale_filter,
         }
         cmd = [
             "ffmpeg", "-y", "-ignore_loop", "0", "-i", image_path,
@@ -131,6 +136,11 @@ def image_to_video_with_effect(image_path: str, output_path: str, duration: floa
             "pop": f"scale=4000:-1,zoompan=z='if(lt(on,15),0.85+0.2*on/15,1.05-0.05*min((on-15)/15,1))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
             "slide": f"scale=2400:-1,zoompan=z='1.1':x='if(lt(on,25),on*8,200)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
             "zoom": f"scale=4000:-1,zoompan=z='1+on/{frames}*0.15':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+            "zoom_out": f"scale=4000:-1,zoompan=z='1.2-on/{frames}*0.15':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+            "pan_left": f"scale=3000:-1,zoompan=z='1.15':x='iw-iw/zoom-on*2':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+            "pan_right": f"scale=3000:-1,zoompan=z='1.15':x='on*2':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
+            "shake": f"scale=4000:-1,zoompan=z='1.1':x='iw/2-(iw/zoom/2)+sin(on*0.5)*15':y='ih/2-(ih/zoom/2)+cos(on*0.7)*10':d={frames}:s={res}",
+            "bounce": f"scale=4000:-1,zoompan=z='1+abs(sin(on*0.15))*0.08':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={res}",
         }
         cmd = [
             "ffmpeg", "-y", "-loop", "1", "-i", image_path,

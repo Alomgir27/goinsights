@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Play, Wand2, MessageSquare, BookOpen, GraduationCap, Film, Mic, Globe, Sparkles, Megaphone, ShoppingBag, Users, Zap, Home, TrendingUp, Eye, ExternalLink, Library } from "lucide-react";
+import { ArrowLeft, Loader2, Play, Wand2, MessageSquare, BookOpen, GraduationCap, Film, Mic, Globe, Sparkles, Megaphone, ShoppingBag, Users, Zap, Home, TrendingUp, Eye, ExternalLink, Library, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { youtube, projects, ai } from "@/lib/api";
 
@@ -418,6 +418,23 @@ export default function NewProject() {
               <p className="text-white/80 text-sm mb-4">Create documentaries from historical events</p>
               <div className="flex flex-wrap gap-1.5">
                 {["On This Day", "Auto Media", "Story Flow"].map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 bg-white/20 text-white/90 rounded text-xs">{tag}</span>
+                ))}
+              </div>
+            </button>
+
+            {/* Inshorts Card */}
+            <button
+              onClick={() => router.push("/inshorts")}
+              className="p-6 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl text-left hover:from-pink-600 hover:to-rose-700 transition-colors"
+            >
+              <div className="w-11 h-11 bg-white/20 rounded-lg flex items-center justify-center mb-4">
+                <Smartphone className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">Inshorts</h3>
+              <p className="text-white/80 text-sm mb-4">Create viral shorts from YouTube videos</p>
+              <div className="flex flex-wrap gap-1.5">
+                {["15-90s", "9:16", "Effects", "AI Picks"].map((tag) => (
                   <span key={tag} className="px-2 py-0.5 bg-white/20 text-white/90 rounded text-xs">{tag}</span>
                 ))}
               </div>

@@ -301,11 +301,7 @@ class WikipediaService:
                 continue
             
             info = page.get("imageinfo", [{}])[0]
-            url = info.get("thumburl") or info.get("url")
             mime = info.get("mime", "")
-            
-            if not url:
-                continue
             
             # Determine media type from MIME
             if "video" in mime:
@@ -314,6 +310,15 @@ class WikipediaService:
                 media_type = "audio"
             else:
                 media_type = "image"
+            
+            # For video/audio use original URL, for images use thumbnail
+            if media_type in ("video", "audio"):
+                url = info.get("url")
+            else:
+                url = info.get("thumburl") or info.get("url")
+            
+            if not url:
+                continue
             
             meta = info.get("extmetadata", {})
             metadata = self._extract_metadata(meta)
@@ -466,7 +471,11 @@ class WikipediaService:
             data = response.json()
             for page in data.get("query", {}).get("pages", {}).values():
                 info = page.get("imageinfo", [{}])[0]
-                url = info.get("thumburl") or info.get("url")
+                # For video/audio use original URL, for images use thumbnail
+                if media_type in ("video", "audio"):
+                    url = info.get("url")
+                else:
+                    url = info.get("thumburl") or info.get("url")
                 if url:
                     meta = info.get("extmetadata", {})
                     metadata = self._extract_metadata(meta)
